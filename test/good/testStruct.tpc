@@ -1,0 +1,22 @@
+int a;
+char un;
+char stp;
+int fonctionne;
+
+struct stru {
+    int x;
+    int y;
+};
+
+struct test foo(struct test arg1, int arg2, char arg3) {
+    return arg3;
+}
+
+int main(void) {
+    a = 1; un = 'a';
+    t = machin(t, a, un);
+
+    print(a); print(un);
+
+    return 0;
+}

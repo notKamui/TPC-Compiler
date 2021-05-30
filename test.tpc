@@ -1,0 +1,16 @@
+int a;
+char etoile;
+struct boom {
+    int x;
+    char y;
+};
+
+void foo(void) {
+    
+}
+
+int main(void) {
+    int b, c;
+    struct boom ouille;
+    return 0;
+}

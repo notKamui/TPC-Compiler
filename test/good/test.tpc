@@ -1,0 +1,41 @@
+struct foo {
+    int y;
+    int x, a;
+};
+
+char l, m, n;
+struct foo w, x;
+
+struct foo test(struct foo a, char b) {
+    int indice, p_indice;
+    somme = 12;
+    if (1) {
+        print(indice);
+    } else {
+        while (somme != 1) {
+            somme = somme - 1;
+        }
+    }
+    (3 + 5) * (2 - 3 / 2);
+    return;
+}
+
+void main(void)  {
+    int somme, produit, quotient, reste, difference ;
+    char letter, digit, punct;
+    int p_compteur;
+    int indice, p_indice;
+    
+
+    test(w, letter);
+    somme = 12;
+    produit = 24;
+    quotient = 24 / 12;
+    letter = 'c';
+    digit = '0';
+    letter = letter + ('A' - 'a');
+    print(quotient);
+    print(letter);
+    print('\n');
+    return 0;
+}
