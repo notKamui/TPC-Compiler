@@ -120,7 +120,6 @@ SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name)
 
     SymbolsTable *t;
     for (t = global->children; t; t = t->next_sibling) {
-        printf("%s\n", t->name);
         if (strcmp(t->name, name) == 0) {
             return t;
         }
