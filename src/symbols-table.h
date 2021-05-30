@@ -24,6 +24,8 @@ SymbolsTable* create_table(Node* root);
 
 void delete_table(SymbolsTable *table);
 
+SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name);
+
 void print_table(SymbolsTable* table);
 
 #endif

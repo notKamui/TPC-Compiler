@@ -113,7 +113,7 @@ static int add_var(SymbolsTable *table, const char *identifier, TPCData *data)
     return 1;
 }
 
-static SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name)
+SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name)
 {
     assert(global);
     assert(name);
@@ -147,7 +147,7 @@ static int add_typesvars(SymbolsTable *table, Node *node)
     if (node->kind == Struct)
     {
         sprintf(tmp, "struct %s", node->u.identifier);
-        struct_table = get_table_by_name(table->parent, tmp);
+        struct_table = get_table_by_name(table->parent ? table->parent : table, tmp);
         sprintf(tmp, "%s.", FIRSTCHILD(node)->u.identifier);
         it = hashtable_iterator_of(struct_table->self);
         while(hashtable_iterator_next(&it))
@@ -370,7 +370,7 @@ void print_table(SymbolsTable *table)
     }
     while (hashtable_iterator_next(&it))
     {
-        printf("\tid: %s   type: %s    %d\n", it.key, tpc_to_str(it.value->type), it.value->offset);
+        printf("\tid: %s   type: %s\n", it.key, tpc_to_str(it.value->type));
     }
 
     printf("\n");

@@ -4,9 +4,11 @@ struct boom {
     int x;
     char y;
 };
+struct boom test;
+
 
 void foo(void) {
-    
+
 }
 
 int main(void) {

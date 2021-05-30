@@ -67,9 +67,24 @@ static char size_to_declsize(size_t size) {
 static void decl_types(Node *type, SymbolsTable *table) {
     char str_type[10];
     Node *n;
-    sprintf(str_type, "res%c", size_to_declsize(prim_to_size(type->u.identifier)));
-    for (n = FIRSTCHILD(type); n; n = n->nextSibling) {
-        fprintf(file, "\t%s: %s 1\n", n->u.identifier, str_type);
+    char tmp[71];
+    HashTableIterator it;
+    SymbolsTable *t;
+    if (type->kind == Primitive) {
+        for (n = FIRSTCHILD(type); n; n = n->nextSibling) {
+            sprintf(str_type, "res%c", size_to_declsize(prim_to_size(type->u.identifier)));
+            fprintf(file, "\t%s: %s 1\n", n->u.identifier, str_type);
+        }
+    } else if (type->kind == Struct) {
+        sprintf(tmp, "struct %s", type->u.identifier);
+        t = get_table_by_name(table->parent ? table->parent : table, tmp);
+        strcpy(tmp, FIRSTCHILD(type)->u.identifier);
+        it = hashtable_iterator_of(t->self);
+        while(hashtable_iterator_next(&it))
+        {
+            sprintf(str_type, "res%c", it.value->type.u.ptype == TPCInt ? 'd' : 'b');
+            fprintf(file, "\t%s.%s: %s 1\n", tmp, it.key, str_type);
+        }
     }
 }
 
