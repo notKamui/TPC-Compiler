@@ -3,3 +3,5 @@ bin
 obj
 a.out
 parser.tab.*
+*.o
+*.asm

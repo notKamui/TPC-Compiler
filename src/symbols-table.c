@@ -3,6 +3,9 @@
 #include "hashtable.h"
 #include "symbol.h"
 
+#define FUNCTION_PARAM 1
+#define NOT_FUNCTION_PARAM 0
+
 static SymbolsTable *init_table(const char *name) {
     assert(name);
 
@@ -111,7 +114,7 @@ SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name) {
 }
 
 // 1 if everything went ok, 0 otherwise
-static int add_typesvars(SymbolsTable *table, Node *node) {
+static int add_typesvars(SymbolsTable *table, Node *node, int function_param) {
     // current node = type
     assert(table);
     assert(node);
@@ -134,12 +137,18 @@ static int add_typesvars(SymbolsTable *table, Node *node) {
             strcpy(tmp2, tmp);
             strcat(tmp2, it.key);
             data = create_data(table, it.value->type);
+            if (function_param) {
+                data->offset = -data->offset - 16;
+            }
             add_var(table, tmp2, data);
         }
     } else {
         type = to_tpc(node);
         for (n = FIRSTCHILD(node); n; n = n->nextSibling) {
             data = create_data(table, type);
+            if (function_param) {
+                data->offset = -data->offset - 16;
+            }
             add_var(table, n->u.identifier, data);
         }
     }
@@ -164,7 +173,7 @@ static int add_declstruct(SymbolsTable *table, Node *node) {
     new_scope = add_table_child(table, name);  // create a new scope
 
     for (n = FIRSTCHILD(node); n; n = n->nextSibling) {  // add all fields of the struct to the table
-        add_typesvars(new_scope, n);
+        add_typesvars(new_scope, n, NOT_FUNCTION_PARAM);
     }
 
     return 1;
@@ -217,6 +226,7 @@ static TPCType to_tpc_ftype(SymbolsTable *table, Node *n) {
         return type;
     }
 
+    table->max_offset = 8;
     for (args = FIRSTCHILD(tmp); args; args = args->nextSibling) {
         if (type.u.ftype.argc > MAX_ARGS) {
             // TODO qqch²
@@ -232,11 +242,11 @@ static TPCType to_tpc_ftype(SymbolsTable *table, Node *n) {
 
         type.u.ftype.args_types[type.u.ftype.argc] = type_func;
         type.u.ftype.argc++;
-        if (!add_typesvars(table, args)) {
+        if (!add_typesvars(table, args, FUNCTION_PARAM)) {
             // TODO qqch
         }
     }
-
+    table->max_offset = 0;
     return type;
 }
 
@@ -248,11 +258,11 @@ static int add_decltypesvars(SymbolsTable *table, Node *node) {
 
     Node *n;
 
-    for (n = FIRSTCHILD(node); n; n = n->nextSibling) {
+    for (n = FIRSTCHILD(node); n; n = n->nextSibling) {  // n = each declaration
         switch (n->kind) {
             case Primitive:
             case Struct:
-                if (!add_typesvars(table, n)) {
+                if (!add_typesvars(table, n, NOT_FUNCTION_PARAM)) {
                     return 0;
                 }
                 break;
@@ -281,7 +291,7 @@ static int add_declfoncts(SymbolsTable *table, Node *node) {
     TPCData *data;
     char buffer[69];
 
-    for (n = FIRSTCHILD(node); n; n = n->nextSibling) {
+    for (n = FIRSTCHILD(node); n; n = n->nextSibling) {  // n = each declfonct of the program
         sprintf(buffer, "func %s", SECONDCHILD(FIRSTCHILD(n))->u.identifier);
         child = add_table_child(table, buffer);
         type = to_tpc_ftype(child, n);
@@ -309,7 +319,6 @@ SymbolsTable *create_table(Node *root) {
 
 void print_table(SymbolsTable *table) {
     SymbolsTable *child;
-
     HashTableIterator it = hashtable_iterator_of(table->self);
     printf("%s", table->name);
     if (table->parent) {

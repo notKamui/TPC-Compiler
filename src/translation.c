@@ -8,6 +8,7 @@
 #define PUSH(r) fprintf(file, "\tpush %s\n", r)
 #define POP(r) fprintf(file, "\tpop %s\n", r)
 #define MOV(r1, r2) fprintf(file, "\tmov %s, %s\n", r1, r2)
+#define LEA(r1, r2) fprintf(file, "\tlea %s, %s\n", r1, r2)
 #define ADD(r1, r2) fprintf(file, "\tadd %s, %s\n", r1, r2)
 #define SUB(r1, r2) fprintf(file, "\tsub %s, %s\n", r1, r2)
 #define IMUL(r1, r2) fprintf(file, "\timul %s, %s\n", r1, r2)
@@ -23,7 +24,7 @@
 #define AND(r1, r2) fprintf(file, "\tand %s, %s\n", r1, r2)
 #define OR(r1, r2) fprintf(file, "\tor %s, %s\n", r1, r2)
 #define RET() fprintf(file, "\tret\n")
-#define SYSCALL() fprintf(file, "\tsyscall\n")
+#define SYSCALL() fprintf(file, "\tsyscall")
 #define CALL(f) fprintf(file, "\tcall %s\n", f)
 
 static FILE *file;
@@ -176,10 +177,20 @@ static void return_instr() {
     }
 }
 
+static void stack_param(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    assert(self);
+    if (self->nextSibling) {
+        stack_param(self->nextSibling, gtable, ftable);
+    }
+    instr(self, gtable, ftable);
+}
+
 static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
     char tmp[16], tmp2[64];
     int local_label;
     TPCData *data;
+    Kind kind;
+
     switch (self->kind) {
         case Return:
             instr(FIRSTCHILD(self), gtable, ftable);
@@ -270,7 +281,7 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
             local_label = labelc;
             labelc++;
             sprintf(tmp, "ENDIF%d", local_label);
-            sprintf(tmp2, "IF%d", local_label);
+            sprintf(tmp2, "ELSE%d", local_label);
             if (THIRDCHILD(self) != NULL && THIRDCHILD(self)->kind == Else) {
                 JE(tmp2);
                 instr(FIRSTCHILD(SECONDCHILD(self)), gtable, ftable);  // instr if
@@ -304,9 +315,19 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
             COMMENT("instr print");
             POP("rsi");
             MOV("rax", "0");
-            switch (FIRSTCHILD(self)->kind) {
+            kind = FIRSTCHILD(self)->kind;
+            switch (kind) {
                 case CharLiteral:
                     MOV("rdi", "fmtc");
+                    break;
+                case LValue:
+                    strcpy(tmp, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
+                    if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
+                        MOV("rdi", data->type.u.ptype == TPCChar ? "fmtc" : "fmtd");
+                    } else {  // global
+                        data = hashtable_get(gtable->self, tmp);
+                        MOV("rdi", data->type.u.ptype == TPCChar ? "fmtc" : "fmtd");
+                    }
                     break;
                 default:
                     MOV("rdi", "fmtd");
@@ -314,9 +335,27 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
             }
             CALL("printf");
             break;
-        case Readc:
         case Reade:
-            instr(FIRSTCHILD(self), gtable, ftable);
+        case Readc:
+            strcpy(tmp, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
+            if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
+                MOV("r9", "rsp");
+                AND("spl", "240");
+                SUB("rsp", "8");
+                PUSH("r9");
+
+                sprintf(tmp2, "[rbp - %d]", data->offset);
+                MOV("rdi", self->kind == Reade ? "fmtd" : "fmtc");
+                LEA("rsi", tmp2);
+                MOV("rax", "0");
+                CALL("scanf");
+            } else {  // global
+                data = hashtable_get(gtable->self, tmp);
+                MOV("rdi", self->kind == Reade ? "fmtd" : "fmtc");
+                MOV("rsi", tmp);
+                MOV("rax", "0");
+                CALL("scanf");
+            }
             break;
         case Assign:
             instr(SECONDCHILD(self), gtable, ftable);
@@ -324,7 +363,7 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
             POP("rax");
             strcpy(tmp, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
             if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
-                sprintf(tmp2, "%s [rbp - %d]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
+                sprintf(tmp2, "%s [rbp - (%d)]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
                 MOV(tmp2, data->type.u.ptype == TPCInt ? "eax" : "al");
             } else {  // global
                 data = hashtable_get(gtable->self, tmp);
@@ -336,7 +375,7 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
             COMMENT("get value");
             strcpy(tmp, FIRSTCHILD(self)->u.identifier);
             if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
-                sprintf(tmp2, "%s [rbp - %d]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
+                sprintf(tmp2, "%s [rbp - (%d)]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
                 MOV(data->type.u.ptype == TPCInt ? "eax" : "al", tmp2);
                 PUSH("rax");
             } else {  // global
@@ -345,6 +384,15 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
                 MOV(data->type.u.ptype == TPCInt ? "eax" : "al", tmp2);
                 PUSH("rax");
             }
+            break;
+        case FunctionCall:
+            MOV("r9", "rsp");
+            stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable);
+            PUSH("r9");
+            CALL(self->u.identifier);
+            POP("rsp");
+            PUSH("rax");
+            break;
         default:
             break;
     }
@@ -379,7 +427,7 @@ static void decl_fonct(Node *fonct, SymbolsTable *gtable) {
     assert(ftable);
 
     LABEL(&(*(name + 5)));
-    POP("rbp");
+    PUSH("rbp");
     MOV("rbp", "rsp");
 
     // declvars

@@ -1,7 +1,15 @@
+int fibo(int n) {
+    if (n == 0 || n == 1) {
+        return n;
+    } else {
+        return fibo(n-1) + fibo(n-2);
+    }
+}
+
 int main(void) {
-    int a;
-    char c;
-    a = 5;
-    c = 'c';
-    return c;
+    int res;
+    res = fibo(9);
+    print(res);
+    print('\n');
+    return 0;
 }
