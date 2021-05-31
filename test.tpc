@@ -7,12 +7,17 @@ struct boom {
 struct boom test;
 
 
-void foo(void) {
-
+int foo(void) {
+    print('b');
+    if (1) {
+        return 1;
+    }
+    print('\n');
+    return 0;
 }
 
-int main(void) {
+int main(int a) {
     int b, c;
     struct boom ouille;
-    return 0;
+    return (3 + 5);
 }

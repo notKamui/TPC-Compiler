@@ -6,11 +6,7 @@
 
 #define MAX_ARGS 20
 
-typedef enum primitive_type {
-    TPCInt,
-    TPCChar
-} PrimitiveType;
-
+typedef enum primitive_type { TPCInt, TPCChar } PrimitiveType;
 
 typedef enum tpc_kind {
     KindPrim,
@@ -31,7 +27,7 @@ typedef struct function_type {
     char function_name[64];
     int no_ret;
     TPCTypeFunc return_type;
-    int argc;    
+    int argc;
     TPCTypeFunc args_types[MAX_ARGS];
 } FunctionType;
 

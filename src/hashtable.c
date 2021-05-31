@@ -1,5 +1,6 @@
-#include <string.h>
 #include "hashtable.h"
+
+#include <string.h>
 
 #define INIT_CAPACITY 32
 
@@ -36,10 +37,10 @@ HashTable *hashtable_new() {
 }
 
 void hashtable_destroy(HashTable *table) {
-    for (size_t i =  0; i < table->capacity; i++) {
+    for (size_t i = 0; i < table->capacity; i++) {
         if (table->entries[i].key != NULL) {
             free((void *)table->entries[i].key);
-            //free(table->entries[i].value);
+            // free(table->entries[i].value);
         }
     }
 
@@ -75,13 +76,9 @@ void *hashtable_get(HashTable *table, const char *key) {
     return NULL;
 }
 
-static const char* hashtable_set_entry(
-    HashTableEntry *entries,
-    size_t capacity, 
-    const char *key,
-    TPCData *value,
-    size_t *plength
-) {
+static const char *hashtable_set_entry(HashTableEntry *entries, size_t capacity,
+                                       const char *key, TPCData *value,
+                                       size_t *plength) {
     u_int64_t hash = hash_key(key);
     size_t index = (size_t)(hash & (u_int64_t)(capacity - 1));
 
@@ -104,7 +101,7 @@ static const char* hashtable_set_entry(
         }
         (*plength)++;
     }
-    
+
     entries[index].key = (char *)key;
     entries[index].value = value;
     return key;
@@ -115,8 +112,8 @@ static int hashtable_expand(HashTable *table) {
     HashTableEntry entry;
     size_t i;
     size_t new_cap = table->capacity * 2;
-    
-    if (new_cap < table->capacity) { // overflow
+
+    if (new_cap < table->capacity) {  // overflow
         return 0;
     }
 
@@ -128,7 +125,8 @@ static int hashtable_expand(HashTable *table) {
     for (i = 0; i < table->capacity; i++) {
         entry = table->entries[i];
         if (entry.key != NULL) {
-            hashtable_set_entry(new_entries, new_cap, entry.key, entry.value, NULL);
+            hashtable_set_entry(new_entries, new_cap, entry.key, entry.value,
+                                NULL);
         }
     }
 
@@ -149,12 +147,11 @@ const char *hashtable_set(HashTable *table, const char *key, TPCData *value) {
         }
     }
 
-    return hashtable_set_entry(table->entries, table->capacity, key, value, &table->length);
+    return hashtable_set_entry(table->entries, table->capacity, key, value,
+                               &table->length);
 }
 
-size_t hashtable_length(HashTable *table) {
-    return table->length;
-}
+size_t hashtable_length(HashTable *table) { return table->length; }
 
 HashTableIterator hashtable_iterator_of(HashTable *table) {
     HashTableIterator iterator;
