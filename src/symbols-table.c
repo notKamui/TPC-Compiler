@@ -156,13 +156,14 @@ static int add_declstruct(SymbolsTable *table, Node *node) {
     Node *n;
     char name[71] = "struct ";
     SymbolsTable *new_scope;
+    TPCType t;
 
-    // add_var(table, node->u.identifier, to_tpc(node));
+    t = to_tpc(node);
+    add_var(table, node->u.identifier, create_data(table, t));
     strcat(name, node->u.identifier);
     new_scope = add_table_child(table, name);  // create a new scope
 
-    for (n = FIRSTCHILD(node); n;
-         n = n->nextSibling) {  // add all fields of the struct to the table
+    for (n = FIRSTCHILD(node); n; n = n->nextSibling) {  // add all fields of the struct to the table
         add_typesvars(new_scope, n);
     }
 

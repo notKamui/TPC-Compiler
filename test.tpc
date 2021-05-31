@@ -1,23 +1,7 @@
-int a;
-char etoile;
-struct boom {
-    int x;
-    char y;
-};
-struct boom test;
-
-
-int foo(void) {
-    print('b');
-    if (1) {
-        return 1;
-    }
-    print('\n');
-    return 0;
-}
-
-int main(int a) {
-    int b, c;
-    struct boom ouille;
-    return (3 + 5);
+int main(void) {
+    int a;
+    char c;
+    a = 5;
+    c = 'c';
+    return c;
 }

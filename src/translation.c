@@ -45,27 +45,23 @@ static char size_to_declsize(size_t size) {
     switch (size) {
         case 1:
             return 'b';
-        case 2:
-            return 'w';
         case 4:
             return 'd';
-        case 8:
-            return 'q';
         default:
             return 0;
     }
 }
 
-/*static char* size_to_asmsize(size_t size) {
+static char *size_to_asmsize(size_t size) {
     switch (size) {
-        case 1: return "BYTE";
-        case 2: return "WORD";
-        case 4: return "DWORD";
-        case 8: return "QWORD";
-        case 10: return "TWORD";
-        default: return NULL;
+        case 1:
+            return "BYTE";
+        case 4:
+            return "DWORD";
+        default:
+            return NULL;
     }
-} */
+}
 
 static void decl_types(Node *type, SymbolsTable *gtable) {
     char str_type[10];
@@ -181,8 +177,9 @@ static void return_instr() {
 }
 
 static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
-    char tmp[16], tmp2[16];
+    char tmp[16], tmp2[64];
     int local_label;
+    TPCData *data;
     switch (self->kind) {
         case Return:
             instr(FIRSTCHILD(self), gtable, ftable);
@@ -320,6 +317,34 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
         case Readc:
         case Reade:
             instr(FIRSTCHILD(self), gtable, ftable);
+            break;
+        case Assign:
+            instr(SECONDCHILD(self), gtable, ftable);
+            COMMENT("instr assignment");
+            POP("rax");
+            strcpy(tmp, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
+            if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
+                sprintf(tmp2, "%s [rbp - %d]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
+                MOV(tmp2, data->type.u.ptype == TPCInt ? "eax" : "al");
+            } else {  // global
+                data = hashtable_get(gtable->self, tmp);
+                sprintf(tmp2, "%s [%s]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), tmp);
+                MOV(tmp2, data->type.u.ptype == TPCInt ? "eax" : "al");
+            }
+            break;
+        case LValue:
+            COMMENT("get value");
+            strcpy(tmp, FIRSTCHILD(self)->u.identifier);
+            if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
+                sprintf(tmp2, "%s [rbp - %d]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
+                MOV(data->type.u.ptype == TPCInt ? "eax" : "al", tmp2);
+                PUSH("rax");
+            } else {  // global
+                data = hashtable_get(gtable->self, tmp);
+                sprintf(tmp2, "%s [%s]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), tmp);
+                MOV(data->type.u.ptype == TPCInt ? "eax" : "al", tmp2);
+                PUSH("rax");
+            }
         default:
             break;
     }

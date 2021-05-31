@@ -132,7 +132,7 @@ F   :  ADDSUB F {if ($1 == '+') {$$ = makeNode(UnaryPlus);} else {$$ = makeNode(
     ;
 LValue:
        IDENT {$$ = makeNode(LValue); Node* n = makeNode(Identifier); strcpy(n->u.identifier, $1); addChild($$, n);}
-    |  IDENT '.' IDENT {$$ = makeNode(LValue); Node* n = makeNode(Identifier); strcpy(n->u.identifier, $1); addChild($$, n);}
+    |  IDENT '.' IDENT {$$ = makeNode(LValue); Node* n = makeNode(Identifier); sprintf(n->u.identifier, "%s.%s", $1, $3); addChild($$, n);}
     ;
 Arguments:
        ListExp {$$ = makeNode(Arguments); addChild($$, $1);}

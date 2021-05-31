@@ -58,7 +58,7 @@ static u_int64_t hash_key(const char *key) {
     return hash;
 }
 
-void *hashtable_get(HashTable *table, const char *key) {
+TPCData *hashtable_get(HashTable *table, const char *key) {
     u_int64_t hash = hash_key(key);
     size_t index = (size_t)(hash & (u_int64_t)(table->capacity - 1));
 
@@ -76,9 +76,7 @@ void *hashtable_get(HashTable *table, const char *key) {
     return NULL;
 }
 
-static const char *hashtable_set_entry(HashTableEntry *entries, size_t capacity,
-                                       const char *key, TPCData *value,
-                                       size_t *plength) {
+static const char *hashtable_set_entry(HashTableEntry *entries, size_t capacity, const char *key, TPCData *value, size_t *plength) {
     u_int64_t hash = hash_key(key);
     size_t index = (size_t)(hash & (u_int64_t)(capacity - 1));
 
@@ -125,8 +123,7 @@ static int hashtable_expand(HashTable *table) {
     for (i = 0; i < table->capacity; i++) {
         entry = table->entries[i];
         if (entry.key != NULL) {
-            hashtable_set_entry(new_entries, new_cap, entry.key, entry.value,
-                                NULL);
+            hashtable_set_entry(new_entries, new_cap, entry.key, entry.value, NULL);
         }
     }
 
@@ -147,8 +144,7 @@ const char *hashtable_set(HashTable *table, const char *key, TPCData *value) {
         }
     }
 
-    return hashtable_set_entry(table->entries, table->capacity, key, value,
-                               &table->length);
+    return hashtable_set_entry(table->entries, table->capacity, key, value, &table->length);
 }
 
 size_t hashtable_length(HashTable *table) { return table->length; }

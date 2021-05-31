@@ -2,6 +2,7 @@
 #define HASHTABLE
 
 #include <stdlib.h>
+
 #include "symbol.h"
 
 /**
@@ -30,7 +31,7 @@ void hashtable_destroy(HashTable *table);
  * @param key the key of the value
  * @return the value corresponding to the key (or NULL if it doesn't exist)
  */
-void *hashtable_get(HashTable *table, const char *key);
+TPCData *hashtable_get(HashTable *table, const char *key);
 
 /**
  * @brief Sets a value to a key in a hash table
@@ -40,7 +41,7 @@ void *hashtable_get(HashTable *table, const char *key);
  * @param value the value to set
  * @return the actual key of the value
  */
-const char* hashtable_set(HashTable *table, const char *key, TPCData *value);
+const char *hashtable_set(HashTable *table, const char *key, TPCData *value);
 
 /**
  * @brief The length of a hash table
