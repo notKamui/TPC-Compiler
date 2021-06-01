@@ -7,6 +7,8 @@
 #define FNV_OFFSET 14695981039346656037UL
 #define FNV_PRIME 1099511628211UL
 
+typedef unsigned long long UINT64;
+
 typedef struct ht_entry {
     const char *key;
     TPCData *value;
@@ -40,7 +42,7 @@ void hashtable_destroy(HashTable *table) {
     for (size_t i = 0; i < table->capacity; i++) {
         if (table->entries[i].key != NULL) {
             free((void *)table->entries[i].key);
-            // free(table->entries[i].value);
+            free(table->entries[i].value);
         }
     }
 
@@ -48,19 +50,19 @@ void hashtable_destroy(HashTable *table) {
     free(table);
 }
 
-static u_int64_t hash_key(const char *key) {
-    u_int64_t hash = FNV_OFFSET;
+static UINT64 hash_key(const char *key) {
+    UINT64 hash = FNV_OFFSET;
     char *p;
     for (p = (char *)key; *p; p++) {
-        hash ^= (u_int64_t)(unsigned char)(*p);
+        hash ^= (UINT64)(unsigned char)(*p);
         hash *= FNV_PRIME;
     }
     return hash;
 }
 
 TPCData *hashtable_get(HashTable *table, const char *key) {
-    u_int64_t hash = hash_key(key);
-    size_t index = (size_t)(hash & (u_int64_t)(table->capacity - 1));
+    UINT64 hash = hash_key(key);
+    size_t index = (size_t)(hash & (UINT64)(table->capacity - 1));
 
     while (table->entries[index].key != NULL) {
         if (strcmp(key, table->entries[index].key) == 0) {
@@ -77,8 +79,8 @@ TPCData *hashtable_get(HashTable *table, const char *key) {
 }
 
 static const char *hashtable_set_entry(HashTableEntry *entries, size_t capacity, const char *key, TPCData *value, size_t *plength) {
-    u_int64_t hash = hash_key(key);
-    size_t index = (size_t)(hash & (u_int64_t)(capacity - 1));
+    UINT64 hash = hash_key(key);
+    size_t index = (size_t)(hash & (UINT64)(capacity - 1));
 
     while (entries[index].key != NULL) {
         if (strcmp(key, entries[index].key) == 0) {

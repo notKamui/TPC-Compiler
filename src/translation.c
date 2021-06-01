@@ -3,66 +3,11 @@
 #include <assert.h>
 #include <string.h>
 
-#define COMMENT(s) fprintf(file, "\t; %s\n", s)
-#define LABEL(l) fprintf(file, "%s:\n", l)
-#define PUSH(r) fprintf(file, "\tpush %s\n", r)
-#define POP(r) fprintf(file, "\tpop %s\n", r)
-#define MOV(r1, r2) fprintf(file, "\tmov %s, %s\n", r1, r2)
-#define LEA(r1, r2) fprintf(file, "\tlea %s, %s\n", r1, r2)
-#define ADD(r1, r2) fprintf(file, "\tadd %s, %s\n", r1, r2)
-#define SUB(r1, r2) fprintf(file, "\tsub %s, %s\n", r1, r2)
-#define IMUL(r1, r2) fprintf(file, "\timul %s, %s\n", r1, r2)
-#define IDIV(r) fprintf(file, "\tidiv %s\n", r)
-#define CMP(r1, r2) fprintf(file, "\tcmp %s, %s\n", r1, r2)
-#define JMP(l) fprintf(file, "\tjmp %s\n", l)
-#define JE(l) fprintf(file, "\tje %s\n", l)
-#define SETZ(r) fprintf(file, "\tsetz %s\n", r)
-#define SETNZ(r) fprintf(file, "\tsetnz %s\n", r)
-#define SETS(r) fprintf(file, "\tsets %s\n", r)
-#define SETLE(r) fprintf(file, "\tsetle %s\n", r)
-#define SETGE(r) fprintf(file, "\tsetge %s\n", r)
-#define AND(r1, r2) fprintf(file, "\tand %s, %s\n", r1, r2)
-#define OR(r1, r2) fprintf(file, "\tor %s, %s\n", r1, r2)
-#define RET() fprintf(file, "\tret\n")
-#define SYSCALL() fprintf(file, "\tsyscall")
-#define CALL(f) fprintf(file, "\tcall %s\n", f)
+#include "translation_utils.h"
 
-static FILE *file;
 static unsigned long long labelc;
 static int in_main;
 static int in_void;
-
-static size_t prim_to_size(char *type) {
-    if (strcmp("char", type) == 0) {
-        return 1;
-    } else if (strcmp("int", type) == 0) {
-        return 4;
-    } else {
-        return 0;
-    }
-}
-
-static char size_to_declsize(size_t size) {
-    switch (size) {
-        case 1:
-            return 'b';
-        case 4:
-            return 'd';
-        default:
-            return 0;
-    }
-}
-
-static char *size_to_asmsize(size_t size) {
-    switch (size) {
-        case 1:
-            return "BYTE";
-        case 4:
-            return "DWORD";
-        default:
-            return NULL;
-    }
-}
 
 static void decl_types(Node *type, SymbolsTable *gtable) {
     char str_type[10];
@@ -144,9 +89,9 @@ static void bool_op(Node *op, SymbolsTable *gtable, SymbolsTable *ftable) {
             CMP("rax", "rbx");
             MOV("rax", "0");
             if (strlen(op->u.identifier) == 2) {
-                SETLE("al");
+                SETNC("al");
             } else {
-                SETS("al");
+                SETC("al");
             }
             break;
         default:
@@ -170,7 +115,6 @@ static void return_instr() {
             POP("rax");
             COMMENT("stack realign");
             MOV("rsp", "rbp");
-            COMMENT("instr return 2nd part");
             POP("rbp");
         }
         RET();
@@ -186,10 +130,11 @@ static void stack_param(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) 
 }
 
 static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
-    char tmp[16], tmp2[64];
+    char tmp[64], tmp2[128];
     int local_label;
     TPCData *data;
     Kind kind;
+    SymbolsTable *t;
 
     switch (self->kind) {
         case Return:
@@ -245,7 +190,7 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
             instr(FIRSTCHILD(self), gtable, ftable);
             COMMENT("instr unary minus");
             POP("rax");
-            IMUL("rax", "-1");
+            NEG("rax");
             PUSH("rax");
             break;
         case Compar:
@@ -254,10 +199,17 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
         case And:
         case Or:
             binop_pop(self, gtable, ftable);
-            COMMENT("bool and/or");
             if (self->kind == And) {
+                COMMENT("bool and");
+                CMP("rax", "0");
+                MOV("rax", "0");
+                SETNZ("al");
+                CMP("rbx", "0");
+                MOV("rbx", "0");
+                SETNZ("bl");
                 AND("rax", "rbx");
             } else {
+                COMMENT("bool or");
                 OR("rax", "rbx");
             }
             MOV("rax", "0");
@@ -387,6 +339,18 @@ static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
             break;
         case FunctionCall:
             MOV("r9", "rsp");
+
+            data = hashtable_get(gtable->self, self->u.identifier);
+            if (!data->type.u.ftype.no_ret) {
+                if (data->type.u.ftype.return_type.kind == KindPrim) {
+                    sprintf(tmp2, "%s", data->type.u.ftype.return_type.u.ptype == TPCInt ? "4" : "1");
+                } else {
+                    sprintf(tmp2, "struct %s", data->type.u.ftype.return_type.u.struct_name);
+                    t = get_table_by_name(gtable, tmp2);
+                    sprintf(tmp2, "%d", t->max_offset);
+                }
+                SUB("rsp", tmp2);
+            }
             stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable);
             PUSH("r9");
             CALL(self->u.identifier);

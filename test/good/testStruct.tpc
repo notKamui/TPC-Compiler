@@ -3,12 +3,12 @@ char un;
 char stp;
 int fonctionne;
 
-struct stru {
+struct bar {
     int x;
     int y;
 };
 
-struct test foo(struct test arg1, int arg2, char arg3) {
+struct test foo(struct bar c, int arg1, int arg2, char arg3) {
     return arg3;
 }
 
