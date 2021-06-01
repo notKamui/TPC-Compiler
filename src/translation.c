@@ -5,9 +5,12 @@
 
 #include "translation_utils.h"
 
+#define INT_MAX_DIGITS 16
 static unsigned long long labelc;
 static int in_main;
 static int in_void;
+
+static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable);
 
 static void decl_types(Node *type, SymbolsTable *gtable) {
     char str_type[10];
@@ -53,53 +56,6 @@ static void decl_typevars(Node *typevars, SymbolsTable *gtable) {
     bss(typevars, gtable);
 }
 
-static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable);
-
-static void binop_pop(Node *op, SymbolsTable *gtable, SymbolsTable *ftable) {
-    instr(FIRSTCHILD(op), gtable, ftable);
-    instr(SECONDCHILD(op), gtable, ftable);
-    POP("rbx");
-    POP("rax");
-}
-
-static void bool_op(Node *op, SymbolsTable *gtable, SymbolsTable *ftable) {
-    switch (op->u.identifier[0]) {
-        case '=':
-        case '!':
-            binop_pop(op, gtable, ftable);
-            CMP("rax", "rbx");
-            MOV("rax", "0");
-            if (op->u.identifier[0] == '=') {
-                SETZ("al");
-            } else {
-                SETNZ("al");
-            }
-            break;
-        case '<':
-        case '>':
-            instr(FIRSTCHILD(op), gtable, ftable);
-            instr(SECONDCHILD(op), gtable, ftable);
-            if (op->u.identifier[0] == '<') {
-                POP("rbx");
-                POP("rax");
-            } else {
-                POP("rax");
-                POP("rbx");
-            }
-            CMP("rax", "rbx");
-            MOV("rax", "0");
-            if (strlen(op->u.identifier) == 2) {
-                SETNC("al");
-            } else {
-                SETC("al");
-            }
-            break;
-        default:
-            break;
-    }
-    PUSH("rax");
-}
-
 static void return_instr() {
     COMMENT("instr return 1st part");
     if (in_main) {
@@ -112,7 +68,7 @@ static void return_instr() {
         SYSCALL();
     } else {
         if (!in_void) {
-            POP("rax");
+            POP("rax");  // TODO
             COMMENT("stack realign");
             MOV("rsp", "rbp");
             POP("rbp");
@@ -121,241 +77,371 @@ static void return_instr() {
     }
 }
 
+static void litteral_instr(Node *self) {
+    char buff[INT_MAX_DIGITS];
+    COMMENT("instr literal");
+    sprintf(buff, "%d", self->kind == IntLiteral ? self->u.integer : (int)self->u.character);
+    PUSH(buff);
+}
+
+static void binop_pop(Node *op, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
+    instr(FIRSTCHILD(op), last_eff_kind, gtable, ftable);
+    instr(SECONDCHILD(op), last_eff_kind, gtable, ftable);
+    POP("rbx");
+    POP("rax");
+}
+
+static void int_binop_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
+    binop_pop(self, last_eff_kind, gtable, ftable);
+    COMMENT("instr int binop");
+    switch (self->kind) {
+        case Plus:
+            ADD("rax", "rbx");
+            break;
+        case Minus:
+            SUB("rax", "rbx");
+            break;
+        case Prod:
+            IMUL("rax", "rbx");
+            break;
+        case Div:
+            MOV("rdx", "0");
+            IDIV("rbx");
+            break;
+        case Mod:
+            MOV("rdx", "0");
+            IDIV("rbx");
+            PUSH("rdx");
+            return;
+        default:
+            break;
+    }
+    PUSH("rax");
+}
+
+static void int_unop_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
+    instr(FIRSTCHILD(self), last_eff_kind, gtable, ftable);
+    if (self->kind == UnaryMinus) {
+        COMMENT("instr unary minus");
+        POP("rax");
+        NEG("rax");
+        PUSH("rax");
+    }
+}
+
+static void bool_binop_instr(Node *op, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
+    switch (op->u.identifier[0]) {
+        case '=':
+        case '!':
+            binop_pop(op, last_eff_kind, gtable, ftable);
+            CMP("rax", "rbx");
+            MOV("rax", "0");
+            if (op->u.identifier[0] == '=') {
+                SETZ("al");
+            } else {
+                SETNZ("al");
+            }
+            break;
+        case '<':
+        case '>':
+            instr(FIRSTCHILD(op), last_eff_kind, gtable, ftable);
+            instr(SECONDCHILD(op), last_eff_kind, gtable, ftable);
+            if (op->u.identifier[0] == '<') {
+                POP("rbx");
+                POP("rax");
+            } else {
+                POP("rax");
+                POP("rbx");
+            }
+            CMP("rax", "rbx");
+            MOV("rax", "0");
+            if (strlen(op->u.identifier) == 2) {
+                SETC("al");
+            } else {
+                SETNC("al");
+            }
+            break;
+        default:
+            break;
+    }
+    PUSH("rax");
+}
+
+static void bool_gate_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
+    binop_pop(self, last_eff_kind, gtable, ftable);
+    if (self->kind == And) {
+        COMMENT("bool and");
+        CMP("rax", "0");
+        MOV("rax", "0");
+        SETNZ("al");
+        CMP("rbx", "0");
+        MOV("rbx", "0");
+        SETNZ("bl");
+        AND("rax", "rbx");
+    } else {
+        COMMENT("bool or");
+        OR("rax", "rbx");
+    }
+    MOV("rax", "0");
+    SETNZ("al");
+    PUSH("rax");
+}
+
+static void not_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
+    instr(FIRSTCHILD(self), last_eff_kind, gtable, ftable);
+    COMMENT("bool not");
+    POP("rax");
+    CMP("rax", "0");
+    MOV("rax", "0");
+    SETZ("al");
+    PUSH("rax");
+}
+
+static void if_else_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    char endif_label[INT_MAX_DIGITS + 5], else_label[INT_MAX_DIGITS + 4];
+    int local_label;
+
+    instr(FIRSTCHILD(self), If, gtable, ftable);
+    COMMENT("instr if");
+    POP("rax");
+    CMP("rax", "0");
+    local_label = labelc;
+    labelc++;
+    sprintf(endif_label, "ENDIF%d", local_label);
+    if (THIRDCHILD(self) != NULL && THIRDCHILD(self)->kind == Else) {
+        sprintf(else_label, "ELSE%d", local_label);
+        JE(else_label);
+        instr(SECONDCHILD(self), If, gtable, ftable);  // instr if
+        JMP(endif_label);
+        LABEL(else_label);
+        instr(FIRSTCHILD(THIRDCHILD(self)), Else, gtable, ftable);  // instr else
+        LABEL(endif_label);
+    } else {
+        JE(endif_label);
+        instr(SECONDCHILD(self), If, gtable, ftable);  // instr if
+        LABEL(endif_label);
+    }
+}
+
+static void while_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    char while_label[INT_MAX_DIGITS + 5], endwhile_label[INT_MAX_DIGITS + 8];
+    int local_label;
+
+    COMMENT("instr while");
+    local_label = labelc;
+    labelc++;
+    sprintf(while_label, "WHILE%d", local_label);
+    sprintf(endwhile_label, "ENDWHILE%d", local_label);
+    LABEL(while_label);
+    instr(FIRSTCHILD(self), While, gtable, ftable);
+    POP("rax");
+    CMP("rax", "0");
+    JE(endwhile_label);
+    instr(SECONDCHILD(self), While, gtable, ftable);
+    JMP(while_label);
+    LABEL(endwhile_label);
+}
+
+static void print_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    char id[ID_SIZE];
+    TPCData *data;
+
+    instr(FIRSTCHILD(self), Print, gtable, ftable);
+    COMMENT("instr print");
+    POP("rsi");
+    MOV("rax", "0");
+    switch (FIRSTCHILD(self)->kind) {
+        case CharLiteral:
+            MOV("rdi", "fmtc");
+            break;
+        case LValue:
+            strcpy(id, FIRSTCHILD(FIRSTCHILD(self))->u.identifier); /* copy the id of the variable */
+            if ((data = hashtable_get(ftable->self, id)) != NULL) { /* local */
+                MOV("rdi", data->type.u.ptype == TPCChar ? "fmtc" : "fmtd");
+            } else {  // global
+                data = hashtable_get(gtable->self, id);
+                MOV("rdi", data->type.u.ptype == TPCChar ? "fmtc" : "fmtd");
+            }
+            break;
+        default:
+            MOV("rdi", "fmtd");
+            break;
+    }
+    CALL("printf");
+}
+
+static void read_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    char buff[ID_SIZE];
+    TPCData *data;
+
+    strcpy(buff, FIRSTCHILD(FIRSTCHILD(self))->u.identifier); /* copy the id ov the */
+    if ((data = hashtable_get(ftable->self, buff)) != NULL) { /* local */
+        MOV("r9", "rsp");
+        AND("spl", "240");
+        SUB("rsp", "8");
+        PUSH("r9");
+
+        sprintf(buff, "[rbp - %d]", data->offset);
+        MOV("rdi", self->kind == Reade ? "fmtd" : "fmtc");
+        LEA("rsi", buff);
+        MOV("rax", "0");
+        CALL("scanf");
+    } else { /* global */
+        data = hashtable_get(gtable->self, buff);
+        MOV("rdi", self->kind == Reade ? "fmtd" : "fmtc");
+        MOV("rsi", buff);
+        MOV("rax", "0");
+        CALL("scanf");
+    }
+}
+
+static void assign_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    char id[ID_SIZE], receiver[16 + INT_MAX_DIGITS + ID_SIZE];
+    TPCData *data;
+
+    instr(SECONDCHILD(self), Assign, gtable, ftable);
+    COMMENT("instr assignment");
+    POP("rax");
+    strcpy(id, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
+    if ((data = hashtable_get(ftable->self, id)) != NULL) { /* local */
+        sprintf(receiver, "%s [rbp - (%d)]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
+        MOV(receiver, data->type.u.ptype == TPCInt ? "eax" : "al");
+    } else { /* global */
+        data = hashtable_get(gtable->self, id);
+        sprintf(receiver, "%s [%s]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), id);
+        MOV(receiver, data->type.u.ptype == TPCInt ? "eax" : "al");
+    }
+}
+
+static void lvalue_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    char id[64], fetched[128];
+    TPCData *data;
+
+    COMMENT("get value");
+    strcpy(id, FIRSTCHILD(self)->u.identifier);
+    if ((data = hashtable_get(ftable->self, id)) != NULL) { /* local */
+        sprintf(fetched, "%s [rbp - (%d)]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
+        MOV(data->type.u.ptype == TPCInt ? "eax" : "al", fetched);
+        PUSH("rax");
+    } else { /* global */
+        data = hashtable_get(gtable->self, id);
+        sprintf(fetched, "%s [%s]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), id);
+        MOV(data->type.u.ptype == TPCInt ? "eax" : "al", fetched);
+        PUSH("rax");
+    }
+}
+
 static void stack_param(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
     assert(self);
     if (self->nextSibling) {
         stack_param(self->nextSibling, gtable, ftable);
     }
-    instr(self, gtable, ftable);
+    instr(self, FunctionCall, gtable, ftable);
 }
 
-static int instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
-    char tmp[64], tmp2[128];
-    int local_label;
+static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
+    char buff[128];
     TPCData *data;
-    Kind kind;
     SymbolsTable *t;
 
+    MOV("r9", "rsp"); /* saves the old rsp position before params stacking in r9 */
+
+    data = hashtable_get(gtable->self, self->u.identifier);
+    if (!data->type.u.ftype.no_ret) {
+        if (data->type.u.ftype.return_type.kind == KindPrim) {
+            strcpy(buff, data->type.u.ftype.return_type.u.ptype == TPCInt ? "4" : "1");
+        } else {
+            sprintf(buff, "struct %s", data->type.u.ftype.return_type.u.struct_name);
+            t = get_table_by_name(gtable, buff);
+            assert(t);
+            sprintf(buff, "%d", t->max_offset);
+        }
+        SUB("rsp", buff); /* allocates the memory for the function return in the stack */
+    }
+    stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable); /* add args of the function on the stack */
+
+    PUSH("r9"); /* push the old rsp position on the top of the stack */
+    CALL(self->u.identifier);
+    POP("rsp");
+    if (last_eff_kind == SuiteInstr) {
+        ADD("rsp", buff); /* buff is always the return size here ; disallocates the unusable returned value */
+    } else {
+        PUSH("rax");
+    }
+}
+
+static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
+    assert(self);
+    assert(gtable);
+    assert(ftable);
+
     switch (self->kind) {
+        case SuiteInstr:
+            instr(FIRSTCHILD(self), self->kind, gtable, ftable);
+            break;
         case Return:
-            instr(FIRSTCHILD(self), gtable, ftable);
+            instr(FIRSTCHILD(self), self->kind, gtable, ftable);
             return_instr();
             return 1;
+        /* litteral instr */
         case IntLiteral:
-            COMMENT("instr int literal");
-            sprintf(tmp, "%d", self->u.integer);
-            PUSH(tmp);
-            break;
         case CharLiteral:
-            COMMENT("instr char literal");
-            sprintf(tmp, "%d", (int)self->u.character);
-            PUSH(tmp);
+            if (last_eff_kind == SuiteInstr) break;
+            litteral_instr(self);
             break;
+        /* int bin op instr*/
         case Plus:
-            binop_pop(self, gtable, ftable);
-            COMMENT("instr add");
-            ADD("rax", "rbx");
-            PUSH("rax");
-            break;
         case Minus:
-            binop_pop(self, gtable, ftable);
-            COMMENT("instr sub");
-            SUB("rax", "rbx");
-            PUSH("rax");
-            break;
         case Prod:
-            binop_pop(self, gtable, ftable);
-            COMMENT("instr mul");
-            IMUL("rax", "rbx");
-            PUSH("rax");
-            break;
         case Div:
-            binop_pop(self, gtable, ftable);
-            COMMENT("instr div");
-            MOV("rdx", "0");
-            IDIV("rbx");
-            PUSH("rax");
-            break;
         case Mod:
-            binop_pop(self, gtable, ftable);
-            COMMENT("instr mod");
-            MOV("rdx", "0");
-            IDIV("rbx");
-            PUSH("rdx");
+            if (last_eff_kind == SuiteInstr) break;
+            int_binop_instr(self, last_eff_kind, gtable, ftable);
             break;
+        /* int unary op instr */
         case UnaryPlus:
-            instr(FIRSTCHILD(self), gtable, ftable);
-            break;
         case UnaryMinus:
-            instr(FIRSTCHILD(self), gtable, ftable);
-            COMMENT("instr unary minus");
-            POP("rax");
-            NEG("rax");
-            PUSH("rax");
+            if (last_eff_kind == SuiteInstr) break;
+            int_unop_instr(self, last_eff_kind, gtable, ftable);
             break;
         case Compar:
-            bool_op(self, gtable, ftable);
+            if (last_eff_kind == SuiteInstr) break;
+            bool_binop_instr(self, last_eff_kind, gtable, ftable);
             break;
+        /* bool gate instr */
         case And:
         case Or:
-            binop_pop(self, gtable, ftable);
-            if (self->kind == And) {
-                COMMENT("bool and");
-                CMP("rax", "0");
-                MOV("rax", "0");
-                SETNZ("al");
-                CMP("rbx", "0");
-                MOV("rbx", "0");
-                SETNZ("bl");
-                AND("rax", "rbx");
-            } else {
-                COMMENT("bool or");
-                OR("rax", "rbx");
-            }
-            MOV("rax", "0");
-            SETNZ("al");
-            PUSH("rax");
+            if (last_eff_kind == SuiteInstr) break;
+            bool_gate_instr(self, last_eff_kind, gtable, ftable);
             break;
+
         case Not:
-            instr(FIRSTCHILD(self), gtable, ftable);
-            COMMENT("bool not");
-            POP("rax");
-            CMP("rax", "0");
-            MOV("rax", "0");
-            SETZ("al");
-            PUSH("rax");
+            if (last_eff_kind == SuiteInstr) break;
+            not_instr(self, last_eff_kind, gtable, ftable);
             break;
         case If:
-            instr(FIRSTCHILD(self), gtable, ftable);
-            COMMENT("instr if");
-            POP("rax");
-            CMP("rax", "0");
-            local_label = labelc;
-            labelc++;
-            sprintf(tmp, "ENDIF%d", local_label);
-            sprintf(tmp2, "ELSE%d", local_label);
-            if (THIRDCHILD(self) != NULL && THIRDCHILD(self)->kind == Else) {
-                JE(tmp2);
-                instr(FIRSTCHILD(SECONDCHILD(self)), gtable, ftable);  // instr if
-                JMP(tmp);
-                LABEL(tmp2);
-                instr(FIRSTCHILD(FIRSTCHILD(THIRDCHILD(self))), gtable, ftable);  // instr else
-                LABEL(tmp);
-            } else {
-                JE(tmp);
-                instr(FIRSTCHILD(SECONDCHILD(self)), gtable, ftable);  // instr if
-                LABEL(tmp);
-            }
+            if_else_instr(self, gtable, ftable);
             break;
         case While:
-            COMMENT("instr while");
-            local_label = labelc;
-            labelc++;
-            sprintf(tmp, "WHILE%d", local_label);
-            sprintf(tmp2, "ENDWHILE%d", local_label);
-            LABEL(tmp);
-            instr(FIRSTCHILD(self), gtable, ftable);
-            POP("rax");
-            CMP("rax", "0");
-            JE(tmp2);
-            instr(FIRSTCHILD(SECONDCHILD(self)), gtable, ftable);
-            JMP(tmp);
-            LABEL(tmp2);
+            while_instr(self, gtable, ftable);
             break;
         case Print:
-            instr(FIRSTCHILD(self), gtable, ftable);
-            COMMENT("instr print");
-            POP("rsi");
-            MOV("rax", "0");
-            kind = FIRSTCHILD(self)->kind;
-            switch (kind) {
-                case CharLiteral:
-                    MOV("rdi", "fmtc");
-                    break;
-                case LValue:
-                    strcpy(tmp, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
-                    if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
-                        MOV("rdi", data->type.u.ptype == TPCChar ? "fmtc" : "fmtd");
-                    } else {  // global
-                        data = hashtable_get(gtable->self, tmp);
-                        MOV("rdi", data->type.u.ptype == TPCChar ? "fmtc" : "fmtd");
-                    }
-                    break;
-                default:
-                    MOV("rdi", "fmtd");
-                    break;
-            }
-            CALL("printf");
+            print_instr(self, gtable, ftable);
             break;
+        /* read instr */
         case Reade:
         case Readc:
-            strcpy(tmp, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
-            if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
-                MOV("r9", "rsp");
-                AND("spl", "240");
-                SUB("rsp", "8");
-                PUSH("r9");
-
-                sprintf(tmp2, "[rbp - %d]", data->offset);
-                MOV("rdi", self->kind == Reade ? "fmtd" : "fmtc");
-                LEA("rsi", tmp2);
-                MOV("rax", "0");
-                CALL("scanf");
-            } else {  // global
-                data = hashtable_get(gtable->self, tmp);
-                MOV("rdi", self->kind == Reade ? "fmtd" : "fmtc");
-                MOV("rsi", tmp);
-                MOV("rax", "0");
-                CALL("scanf");
-            }
+            read_instr(self, gtable, ftable);
             break;
         case Assign:
-            instr(SECONDCHILD(self), gtable, ftable);
-            COMMENT("instr assignment");
-            POP("rax");
-            strcpy(tmp, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
-            if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
-                sprintf(tmp2, "%s [rbp - (%d)]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
-                MOV(tmp2, data->type.u.ptype == TPCInt ? "eax" : "al");
-            } else {  // global
-                data = hashtable_get(gtable->self, tmp);
-                sprintf(tmp2, "%s [%s]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), tmp);
-                MOV(tmp2, data->type.u.ptype == TPCInt ? "eax" : "al");
-            }
+            assign_instr(self, gtable, ftable);
             break;
         case LValue:
-            COMMENT("get value");
-            strcpy(tmp, FIRSTCHILD(self)->u.identifier);
-            if ((data = hashtable_get(ftable->self, tmp)) != NULL) {  // local
-                sprintf(tmp2, "%s [rbp - (%d)]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
-                MOV(data->type.u.ptype == TPCInt ? "eax" : "al", tmp2);
-                PUSH("rax");
-            } else {  // global
-                data = hashtable_get(gtable->self, tmp);
-                sprintf(tmp2, "%s [%s]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), tmp);
-                MOV(data->type.u.ptype == TPCInt ? "eax" : "al", tmp2);
-                PUSH("rax");
-            }
+            if (last_eff_kind == SuiteInstr) break;
+            lvalue_instr(self, gtable, ftable);
             break;
         case FunctionCall:
-            MOV("r9", "rsp");
-
-            data = hashtable_get(gtable->self, self->u.identifier);
-            if (!data->type.u.ftype.no_ret) {
-                if (data->type.u.ftype.return_type.kind == KindPrim) {
-                    sprintf(tmp2, "%s", data->type.u.ftype.return_type.u.ptype == TPCInt ? "4" : "1");
-                } else {
-                    sprintf(tmp2, "struct %s", data->type.u.ftype.return_type.u.struct_name);
-                    t = get_table_by_name(gtable, tmp2);
-                    sprintf(tmp2, "%d", t->max_offset);
-                }
-                SUB("rsp", tmp2);
-            }
-            stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable);
-            PUSH("r9");
-            CALL(self->u.identifier);
-            POP("rsp");
-            PUSH("rax");
+            functioncall_instr(self, last_eff_kind, gtable, ftable);
             break;
         default:
             break;
@@ -369,7 +455,7 @@ static int suite_instr(Node *instructions, SymbolsTable *gtable, SymbolsTable *f
 
     end_return = 0;
     for (n = FIRSTCHILD(instructions); n; n = n->nextSibling) {
-        end_return = instr(n, gtable, ftable);
+        end_return = instr(n, SuiteInstr, gtable, ftable);
     }
     return end_return;
 }

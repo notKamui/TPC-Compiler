@@ -1,5 +1,5 @@
 int abso(int n) {
-    if (n >= 0) {
+    if (n > 0) {
         return n;
     } else {
         return -n;
@@ -8,6 +8,8 @@ int abso(int n) {
 
 int main(void) {
     int a;
-    a = -5;
-    return abso(a);
+    a = 0;
+    a = 2 + a;
+    a;
+    return a;
 }
