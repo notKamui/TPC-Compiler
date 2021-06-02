@@ -2,6 +2,7 @@
   #include <stdio.h>
   #include <string.h>
   #include <unistd.h>
+  #include <signal.h>
   #include "abstract-tree.h"
   #include "symbols-table.h"
   #include "translation.h"
@@ -12,6 +13,7 @@
   int yylex();
   void yyerror(const char *);
   struct Node* rootProg;
+  SymbolsTable* table;
 %}
 
 
@@ -145,6 +147,19 @@ ListExp:
 
 %%
 
+void sig_handler(int sig) {
+    deleteTree(rootProg);
+    switch (sig) {
+        case SIGUSR1:
+            exit(2);
+            break;
+        case SIGUSR2:
+            exit(3);
+        default:
+            break;
+    }
+}
+
 int main(int argc, char** argv) {
     int option;
     int showAST = 0;
@@ -155,6 +170,9 @@ int main(int argc, char** argv) {
     char cut[64];
     FILE *file;
     FILE *output;
+
+    signal(SIGUSR1, sig_handler);
+    signal(SIGUSR2, sig_handler);
 
     while ((option = getopt(argc, argv, ":tsnh")) != -1) {
         switch(option) {
@@ -197,7 +215,7 @@ int main(int argc, char** argv) {
 
     int ret = yyparse();
     if (ret) exit(1);
-    SymbolsTable* table = create_table(rootProg);
+    table = create_table(rootProg);
 
     if (showAST) {
         printTree(rootProg);
@@ -211,6 +229,8 @@ int main(int argc, char** argv) {
         output = fopen(fname ,"w");
         if (output == NULL) {
             fprintf(stderr, "Error: Couldn't write to output file\n");
+            delete_table(table);
+            deleteTree(rootProg);
             exit(3);
         }
         write_nasm(output, rootProg, table);

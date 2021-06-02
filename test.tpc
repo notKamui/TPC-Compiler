@@ -1,16 +1,9 @@
-char foo(char a) {
-    print(a);
+void print_sum(int a, int b) {
+    print(a + b);
     print('\n');
-    return 'z';
 }
 
 int main(void) {
-    char a;
-    a = 'b';
-    print(a);
-    print('\n');
-    a = foo('c');
-    print(a);
-    print('\n');
+    print_sum(1, 2);
     return 0;
 }
