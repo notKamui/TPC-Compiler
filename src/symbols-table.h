@@ -23,6 +23,7 @@ typedef struct symbols {
     struct symbols *firstChild;   /* the first child of the table */
     struct symbols *next_sibling; /* the next sibling of the table */
     int max_offset;               /* the max offset of the symbols in the stack */
+    int args_size;                /* the byte size of the function args */
 } SymbolsTable;
 
 /**

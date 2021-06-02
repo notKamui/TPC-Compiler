@@ -20,14 +20,14 @@
 #define SETZ(r) fprintf(file, "\tsetz %s\n", r)
 #define SETNZ(r) fprintf(file, "\tsetnz %s\n", r)
 #define SETS(r) fprintf(file, "\tsets %s\n", r)
-#define SETNC(r) fprintf(file, "\tsetnc %s\n", r)
-#define SETC(r) fprintf(file, "\tsetc %s\n", r)
+#define SETG(r) fprintf(file, "\tsetg %s\n", r)
+#define SETL(r) fprintf(file, "\tsetl %s\n", r)
 #define SETLE(r) fprintf(file, "\tsetle %s\n", r)
 #define SETGE(r) fprintf(file, "\tsetge %s\n", r)
 #define AND(r1, r2) fprintf(file, "\tand %s, %s\n", r1, r2)
 #define OR(r1, r2) fprintf(file, "\tor %s, %s\n", r1, r2)
 #define RET() fprintf(file, "\tret\n")
-#define SYSCALL() fprintf(file, "\tsyscall")
+#define SYSCALL() fprintf(file, "\tsyscall\n")
 #define CALL(f) fprintf(file, "\tcall %s\n", f)
 
 size_t prim_to_size(char *type);

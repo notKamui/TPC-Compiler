@@ -220,22 +220,31 @@ static void add_typesvars(SymbolsTable *table, Node *node, int function_param) {
     if (node->kind == Struct) {
         sprintf(table_name, "%s%s", STRUCT_PREFIX, node->u.identifier); /* creating the name of the struct table */
         struct_table = get_table_by_name(table->parent ? table->parent : table, table_name, node->lineno);
-        it = hashtable_iterator_of(struct_table->self);
-        while (hashtable_iterator_next(&it)) {                                    /* adding each field of the struct in the table */
-            sprintf(identifier, "%s.%s", FIRSTCHILD(node)->u.identifier, it.key); /* writing the struct id */
-            data = create_data(table, it.value->offset + table->max_offset, it.value->type);
-            data->offset = function_param ? (-data->offset - 16) : data->offset; /* if the symbol represents a func parameter */
-            add_symbol(table, identifier, data, node->lineno);
+        for (n = FIRSTCHILD(node); n; n = n->nextSibling) {
+            it = hashtable_iterator_of(struct_table->self);
+            while (hashtable_iterator_next(&it)) {                     /* adding each field of the struct in the table */
+                sprintf(identifier, "%s.%s", n->u.identifier, it.key); /* writing the struct id */
+                data = create_data(table, it.value->offset + table->max_offset, it.value->type);
+                if (function_param) { /* if the symbol represents a func parameter */
+                    data->offset = -data->offset - 16;
+                    table->args_size += it.value->type.u.ptype == TPCInt ? 4 : 1;
+                }
+
+                add_symbol(table, identifier, data, node->lineno);
+            }
+            data = create_data(table, 0, to_tpc(node));
+            add_symbol(table, n->u.identifier, data, node->lineno);
+            table->max_offset += struct_table->max_offset;
         }
-        data = create_data(table, 0, to_tpc(node));
-        add_symbol(table, FIRSTCHILD(node)->u.identifier, data, node->lineno);
-        table->max_offset += struct_table->max_offset;
     } else {
         type = to_tpc(node);
         for (n = FIRSTCHILD(node); n; n = n->nextSibling) {
             data = create_data(table, table->max_offset, type);
             table->max_offset += type.u.ptype == TPCInt ? 4 : 1;
-            data->offset = function_param ? (-data->offset - 16) : data->offset; /* if the symbol represents a func parameter */
+            if (function_param) { /* if the symbol represents a func parameter */
+                data->offset = -data->offset - 16;
+                table->args_size += type.u.ptype == TPCInt ? 4 : 1;
+            }
             add_symbol(table, n->u.identifier, data, n->lineno);
         }
     }
