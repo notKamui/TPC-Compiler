@@ -1,9 +1,14 @@
-void print_sum(int a, int b) {
+struct foo {
+    int a;
+};
+
+void print_sum(int a, char b) {
     print(a + b);
     print('\n');
 }
 
 int main(void) {
+    struct foo a;
     print_sum(1, 2);
     return 0;
 }

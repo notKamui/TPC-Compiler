@@ -1,11 +1,16 @@
 #include "translation.h"
 
 #include <assert.h>
+#include <signal.h>
 #include <string.h>
 
 #include "translation_utils.h"
 
 #define INT_MAX_DIGITS 16
+#define INT_TYPE 0
+#define CHAR_TYPE 1
+#define STRUCT_TYPE 2
+
 FILE *file;
 static unsigned long long labelc;
 static int in_main;
@@ -438,6 +443,82 @@ static void stack_param(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) 
     space_before_end += 8 - param_size;
 }
 
+static void functioncall_check(Node *self, TPCData *fdata, SymbolsTable *gtable, SymbolsTable *ftable) {
+    int nb_args, n_type;
+    TPCData *type_data;
+    Node *n;
+    TPCTypeFunc type;
+
+    nb_args = 0;
+    for (n = FIRSTCHILD(FIRSTCHILD(self)); n; n = n->nextSibling) {
+        if (n->kind == LValue) {
+            if ((type_data = hashtable_get(ftable->self, FIRSTCHILD(n)->u.identifier)) != NULL) { /* local */
+                if (type_data->type.kind == KindPrim) {
+                    n_type = type_data->type.u.ptype == TPCInt ? INT_TYPE : CHAR_TYPE;
+                } else { /* KindStruct */
+                    n_type = STRUCT_TYPE;
+                }
+            } else { /* global */
+                type_data = hashtable_get(gtable->self, FIRSTCHILD(n)->u.identifier);
+                if (type_data == NULL) { /* TODO THIS IS TEMPORARY : we cant deal with struct right now */
+                    nb_args++;
+                    continue;
+                }
+                if (type_data->type.kind == KindPrim) {
+                    n_type = type_data->type.u.ptype == TPCInt ? INT_TYPE : CHAR_TYPE;
+                } else { /* KindStruct */
+                    n_type = STRUCT_TYPE;
+                }
+            }
+        } else {
+            n_type = n->kind == CharLiteral ? CHAR_TYPE : INT_TYPE;
+        }
+        type = fdata->type.u.ftype.args_types[nb_args];
+        if (type.kind == KindPrim) {
+            if (type.u.ptype == TPCInt) {
+                if (n_type == STRUCT_TYPE) { /* is struct */
+                    fprintf(stderr, "Semantic Error: function '%s' argument %d, expected int, got struct %s\n", self->u.identifier, nb_args + 1, FIRSTCHILD(n)->u.identifier);
+                    raise(SIGUSR1);
+                }
+            } else { /* TPCChar */
+                if (n->kind == IntLiteral) {
+                    fprintf(stderr, "Warning: function '%s' argument %d, expected char, got int\n", self->u.identifier, nb_args + 1);
+                } else if (n->kind == LValue) {
+                    /* TODO check n's lvalue, if int->warning, if struct->sem err */
+                    if (n_type == INT_TYPE) { /* is int */
+                        fprintf(stderr, "Warning: function '%s' argument %d, expected char, got int\n", self->u.identifier, nb_args + 1);
+                    } else if (n_type == STRUCT_TYPE) { /* is struct */
+                        fprintf(stderr, "Semantic Error: function '%s' argument %d, expected char, got struct %s\n", self->u.identifier, nb_args + 1, FIRSTCHILD(n)->u.identifier);
+                        raise(SIGUSR1);
+                    }
+                } else { /* SuiteInstr (int) */
+                    fprintf(stderr, "Warning: function '%s' argument %d, expected char, got int\n", self->u.identifier, nb_args + 1);
+                }
+            }
+        } else {
+            if (n_type == INT_TYPE) {
+                fprintf(stderr, "Semantic Error: function '%s' argument %d, expected struct %s, got int\n", self->u.identifier, nb_args + 1, type_data->type.u.struct_name);
+                raise(SIGUSR1);
+            } else if (n_type == CHAR_TYPE) {
+                fprintf(stderr, "Semantic Error: function '%s' argument %d, expected struct %s, got char\n", self->u.identifier, nb_args + 1, type_data->type.u.struct_name);
+                raise(SIGUSR1);
+            } else if (strcmp(type_data->type.u.struct_name, FIRSTCHILD(n)->u.identifier) != 0) { /* not same struct */
+                fprintf(stderr, "Semantic Error: function '%s' argument %d, expected struct %s, got struct %s\n", self->u.identifier, nb_args + 1, type_data->type.u.struct_name, FIRSTCHILD(n)->u.identifier);
+                raise(SIGUSR1);
+            }
+        }
+        nb_args++;
+    }
+
+    if (fdata->type.u.ftype.argc > nb_args) {
+        fprintf(stderr, "Semantic Error: not enough arguments given to function '%s'\n", self->u.identifier);
+        raise(SIGUSR1);
+    } else if (fdata->type.u.ftype.argc < nb_args) {
+        fprintf(stderr, "Semantic Error: too many arguments given to function '%s'\n", self->u.identifier);
+        raise(SIGUSR1);
+    }
+}
+
 static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
     char buff[128];
     TPCData *data;
@@ -445,6 +526,9 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
 
     data = hashtable_get(gtable->self, self->u.identifier);
     assert(data);
+
+    functioncall_check(self, data, gtable, ftable);
+
     if (!data->type.u.ftype.no_ret) {
         if (data->type.u.ftype.return_type.kind == KindPrim) {
             strcpy(buff, data->type.u.ftype.return_type.u.ptype == TPCInt ? "4" : "1");

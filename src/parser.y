@@ -14,6 +14,7 @@
   void yyerror(const char *);
   struct Node* rootProg;
   SymbolsTable* table;
+  FILE *output;
 %}
 
 
@@ -149,6 +150,7 @@ ListExp:
 
 void sig_handler(int sig) {
     deleteTree(rootProg);
+    fclose(output);
     switch (sig) {
         case SIGUSR1:
             exit(2);
@@ -169,7 +171,6 @@ int main(int argc, char** argv) {
     char *tmp;
     char cut[64];
     FILE *file;
-    FILE *output;
 
     signal(SIGUSR1, sig_handler);
     signal(SIGUSR2, sig_handler);
@@ -230,8 +231,7 @@ int main(int argc, char** argv) {
         if (output == NULL) {
             fprintf(stderr, "Error: Couldn't write to output file\n");
             delete_table(table);
-            deleteTree(rootProg);
-            exit(3);
+            raise(SIGUSR2);
         }
         write_nasm(output, rootProg, table);
         fclose(output);
