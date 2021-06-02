@@ -1,14 +1,17 @@
-struct foo {
+struct bar {
     int a;
 };
 
-void print_sum(int a, char b) {
-    print(a + b);
+void foo(int a, struct bar b) {
+    print(a);
     print('\n');
 }
 
 int main(void) {
-    struct foo a;
-    print_sum(1, 2);
+    int a;
+    a = 5;
+    print(a);
+    print('\n');
+    foo(1, 'x');
     return 0;
 }

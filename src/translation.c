@@ -29,13 +29,12 @@ static void decl_types(Node *type, SymbolsTable *gtable) {
     SymbolsTable *t;
     if (type->kind == Primitive) {
         for (n = FIRSTCHILD(type); n; n = n->nextSibling) {
-            sprintf(str_type, "res%c",
-                    size_to_declsize(prim_to_size(type->u.identifier)));
+            sprintf(str_type, "res%c", size_to_declsize(prim_to_size(type->u.identifier)));
             fprintf(file, "\t%s: %s 1\n", n->u.identifier, str_type);
         }
     } else if (type->kind == Struct) {
         sprintf(tmp, "struct %s", type->u.identifier);
-        t = get_table_by_name(gtable->parent ? gtable->parent : gtable, tmp);
+        t = get_table_by_name(gtable->parent ? gtable->parent : gtable, tmp, type->lineno);
         strcpy(tmp, FIRSTCHILD(type)->u.identifier);
         it = hashtable_iterator_of(t->self);
         while (hashtable_iterator_next(&it)) {
@@ -405,7 +404,6 @@ static void lvalue_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable)
     if ((data = hashtable_get(ftable->self, id)) != NULL) { /* local */
         fetched_size = data->type.u.ptype == TPCInt ? 4 : 1;
         data_offset = data->offset > 0 ? data->offset - fetched_size : data->offset;
-        printf("initial: %d\tfinal: %d\n", data->offset, data_offset);
         sprintf(fetched, "%s [rbp - (%ld)]", size_to_asmsize(fetched_size), data_offset + fetched_size); /* TODO fuck this also */
         MOV(data->type.u.ptype == TPCInt ? "eax" : "al", fetched);
         PUSH("rax");
@@ -449,8 +447,23 @@ static void functioncall_check(Node *self, TPCData *fdata, SymbolsTable *gtable,
     Node *n;
     TPCTypeFunc type;
 
+    if (FIRSTCHILD(self) == NULL && fdata->type.u.ftype.argc != 0) {
+        fprintf(stderr, "Semantic Error, near line %d: not enough arguments given to function '%s'\n", self->lineno, self->u.identifier);
+        raise(SIGUSR1);
+    } else if (FIRSTCHILD(self) != NULL && fdata->type.u.ftype.argc == 0) {
+        fprintf(stderr, "Semantic Error, near line %d: too many arguments given to function '%s'\n", self->lineno, self->u.identifier);
+        raise(SIGUSR1);
+    } else if (FIRSTCHILD(self) != NULL && fdata->type.u.ftype.argc == 0) {
+        return;
+    }
+
     nb_args = 0;
     for (n = FIRSTCHILD(FIRSTCHILD(self)); n; n = n->nextSibling) {
+        nb_args++;
+        if (fdata->type.u.ftype.argc < nb_args) {
+            fprintf(stderr, "Semantic Error, near line %d: too many arguments given to function '%s'\n", self->lineno, self->u.identifier);
+            raise(SIGUSR1);
+        }
         if (n->kind == LValue) {
             if ((type_data = hashtable_get(ftable->self, FIRSTCHILD(n)->u.identifier)) != NULL) { /* local */
                 if (type_data->type.kind == KindPrim) {
@@ -460,10 +473,7 @@ static void functioncall_check(Node *self, TPCData *fdata, SymbolsTable *gtable,
                 }
             } else { /* global */
                 type_data = hashtable_get(gtable->self, FIRSTCHILD(n)->u.identifier);
-                if (type_data == NULL) { /* TODO THIS IS TEMPORARY : we cant deal with struct right now */
-                    nb_args++;
-                    continue;
-                }
+
                 if (type_data->type.kind == KindPrim) {
                     n_type = type_data->type.u.ptype == TPCInt ? INT_TYPE : CHAR_TYPE;
                 } else { /* KindStruct */
@@ -473,54 +483,49 @@ static void functioncall_check(Node *self, TPCData *fdata, SymbolsTable *gtable,
         } else {
             n_type = n->kind == CharLiteral ? CHAR_TYPE : INT_TYPE;
         }
-        type = fdata->type.u.ftype.args_types[nb_args];
+        type = fdata->type.u.ftype.args_types[nb_args - 1];
         if (type.kind == KindPrim) {
             if (type.u.ptype == TPCInt) {
                 if (n_type == STRUCT_TYPE) { /* is struct */
-                    fprintf(stderr, "Semantic Error: function '%s' argument %d, expected int, got struct %s\n", self->u.identifier, nb_args + 1, FIRSTCHILD(n)->u.identifier);
+                    fprintf(stderr, "Semantic Error, near line %d: function '%s' argument %d, expected int, got struct %s\n", self->lineno, self->u.identifier, nb_args, FIRSTCHILD(n)->u.identifier);
                     raise(SIGUSR1);
                 }
             } else { /* TPCChar */
                 if (n->kind == IntLiteral) {
-                    fprintf(stderr, "Warning: function '%s' argument %d, expected char, got int\n", self->u.identifier, nb_args + 1);
+                    fprintf(stderr, "Warning, near line %d: function '%s' argument %d, expected char, got int\n", self->lineno, self->u.identifier, nb_args);
                 } else if (n->kind == LValue) {
-                    /* TODO check n's lvalue, if int->warning, if struct->sem err */
                     if (n_type == INT_TYPE) { /* is int */
-                        fprintf(stderr, "Warning: function '%s' argument %d, expected char, got int\n", self->u.identifier, nb_args + 1);
+                        fprintf(stderr, "Warning, near line %d: function '%s' argument %d, expected char, got int\n", self->lineno, self->u.identifier, nb_args);
                     } else if (n_type == STRUCT_TYPE) { /* is struct */
-                        fprintf(stderr, "Semantic Error: function '%s' argument %d, expected char, got struct %s\n", self->u.identifier, nb_args + 1, FIRSTCHILD(n)->u.identifier);
+                        fprintf(stderr, "Semantic Error, near line %d: function '%s' argument %d, expected char, got struct %s\n", self->lineno, self->u.identifier, nb_args, FIRSTCHILD(n)->u.identifier);
                         raise(SIGUSR1);
                     }
                 } else { /* SuiteInstr (int) */
-                    fprintf(stderr, "Warning: function '%s' argument %d, expected char, got int\n", self->u.identifier, nb_args + 1);
+                    fprintf(stderr, "Warning, near line %d: function '%s' argument %d, expected char, got int\n", self->lineno, self->u.identifier, nb_args);
                 }
             }
         } else {
             if (n_type == INT_TYPE) {
-                fprintf(stderr, "Semantic Error: function '%s' argument %d, expected struct %s, got int\n", self->u.identifier, nb_args + 1, type_data->type.u.struct_name);
+                fprintf(stderr, "Semantic Error, near line %d: function '%s' argument %d, expected struct %s, got int\n", self->lineno, self->u.identifier, nb_args, type_data->type.u.struct_name);
                 raise(SIGUSR1);
             } else if (n_type == CHAR_TYPE) {
-                fprintf(stderr, "Semantic Error: function '%s' argument %d, expected struct %s, got char\n", self->u.identifier, nb_args + 1, type_data->type.u.struct_name);
+                fprintf(stderr, "Semantic Error, near line %d: function '%s' argument %d, expected struct %s, got char\n", self->lineno, self->u.identifier, nb_args, type_data->type.u.struct_name);
                 raise(SIGUSR1);
             } else if (strcmp(type_data->type.u.struct_name, FIRSTCHILD(n)->u.identifier) != 0) { /* not same struct */
-                fprintf(stderr, "Semantic Error: function '%s' argument %d, expected struct %s, got struct %s\n", self->u.identifier, nb_args + 1, type_data->type.u.struct_name, FIRSTCHILD(n)->u.identifier);
+                fprintf(stderr, "Semantic Error, near line %d: function '%s' argument %d, expected struct %s, got struct %s\n", self->lineno, self->u.identifier, nb_args, type_data->type.u.struct_name, FIRSTCHILD(n)->u.identifier);
                 raise(SIGUSR1);
             }
         }
-        nb_args++;
     }
 
     if (fdata->type.u.ftype.argc > nb_args) {
-        fprintf(stderr, "Semantic Error: not enough arguments given to function '%s'\n", self->u.identifier);
-        raise(SIGUSR1);
-    } else if (fdata->type.u.ftype.argc < nb_args) {
-        fprintf(stderr, "Semantic Error: too many arguments given to function '%s'\n", self->u.identifier);
+        fprintf(stderr, "Semantic Error, near line %d: not enough arguments given to function '%s'\n", self->lineno, self->u.identifier);
         raise(SIGUSR1);
     }
 }
 
 static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
-    char buff[128];
+    char buff[128], buff2[128];
     TPCData *data;
     SymbolsTable *t;
 
@@ -534,7 +539,7 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
             strcpy(buff, data->type.u.ftype.return_type.u.ptype == TPCInt ? "4" : "1");
         } else {
             sprintf(buff, "struct %s", data->type.u.ftype.return_type.u.struct_name);
-            t = get_table_by_name(gtable, buff);
+            t = get_table_by_name(gtable, buff, self->lineno);
             assert(t);
             sprintf(buff, "%d", t->max_offset);
         }
@@ -547,16 +552,18 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
 
         stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable); /* add args of the function on the stack */
 
-        sprintf(buff, "%ld", space_before_end);
-        ADD("rsp", buff); /* realigning the stack */
+        sprintf(buff2, "%ld", space_before_end);
+        ADD("rsp", buff2); /* realigning the stack */
     }
 
     PUSH("r9"); /* push the old rsp position on the top of the stack */
     CALL(self->u.identifier);
     POP("rsp");
-    if (last_eff_kind == SuiteInstr) {
-        ADD("rsp", buff); /* buff is always the return size here ; disallocates the unusable returned value */
-    }
+
+    /* TODO wat, c cassé */
+    // if (last_eff_kind == SuiteInstr) {
+    //     ADD("rsp", buff); /* buff is always the return size here ; disallocates the unusable returned value */
+    // }
 }
 
 static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
@@ -668,7 +675,7 @@ static size_t return_size(Node *fonct, SymbolsTable *gtable) {
         return prim_to_size(ret->u.identifier);
     } else if (ret->kind == Struct) {
         sprintf(struct_name, "struct %s", ret->u.identifier);
-        table = get_table_by_name(gtable, struct_name);
+        table = get_table_by_name(gtable, struct_name, ret->lineno);
         assert(table);
         return table->max_offset;
     } else {
@@ -683,7 +690,7 @@ static void decl_fonct(Node *fonct, SymbolsTable *gtable) {
     assert(gtable);
 
     sprintf(name, "func %s", SECONDCHILD(FIRSTCHILD(fonct))->u.identifier);
-    ftable = get_table_by_name(gtable, name);
+    ftable = get_table_by_name(gtable, name, fonct->lineno);
     assert(ftable);
 
     LABEL(&(*(name + 5)));

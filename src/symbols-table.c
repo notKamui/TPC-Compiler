@@ -31,7 +31,7 @@ void delete_table(SymbolsTable *table) {
  * @param name the name of the table to fetch.
  * @return the fetched symbols table.
  */
-SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name) {
+SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name, int line) {
     SymbolsTable *t;
 
     assert(global);
@@ -42,7 +42,7 @@ SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name) {
             return t;
         }
     }
-    fprintf(stderr, "Semantic Error: unknown symbol '%s'\n", name);
+    fprintf(stderr, "Semantic Error, near line %d: unknown symbol '%s'\n", line, name);
     raise(SIGUSR1);
     return NULL;
 }
@@ -181,13 +181,13 @@ static TPCData *create_data(SymbolsTable *table, int offset, const TPCType type)
  *  @param identifier the name of the symbol.
  *  @param data the tpc data of the symbol.
 */
-static void add_symbol(SymbolsTable *table, const char identifier[ID_SIZE], TPCData *data) {
+static void add_symbol(SymbolsTable *table, const char identifier[ID_SIZE], TPCData *data, int line) {
     assert(table);
     assert(identifier);
     assert(data);
 
     if (hashtable_get(table->self, identifier) != NULL) { /* to catch multiple declarations */
-        fprintf(stderr, "Semantic Error: symbol '%s' already defined\n", identifier);
+        fprintf(stderr, "Semantic Error, near line %d: symbol '%s' already defined\n", line, identifier);
         raise(SIGUSR1);
     }
 
@@ -219,14 +219,16 @@ static void add_typesvars(SymbolsTable *table, Node *node, int function_param) {
 
     if (node->kind == Struct) {
         sprintf(table_name, "%s%s", STRUCT_PREFIX, node->u.identifier); /* creating the name of the struct table */
-        struct_table = get_table_by_name(table->parent ? table->parent : table, table_name);
+        struct_table = get_table_by_name(table->parent ? table->parent : table, table_name, node->lineno);
         it = hashtable_iterator_of(struct_table->self);
         while (hashtable_iterator_next(&it)) {                                    /* adding each field of the struct in the table */
             sprintf(identifier, "%s.%s", FIRSTCHILD(node)->u.identifier, it.key); /* writing the struct id */
             data = create_data(table, it.value->offset + table->max_offset, it.value->type);
             data->offset = function_param ? (-data->offset - 16) : data->offset; /* if the symbol represents a func parameter */
-            add_symbol(table, identifier, data);
+            add_symbol(table, identifier, data, node->lineno);
         }
+        data = create_data(table, 0, to_tpc(node));
+        add_symbol(table, FIRSTCHILD(node)->u.identifier, data, node->lineno);
         table->max_offset += struct_table->max_offset;
     } else {
         type = to_tpc(node);
@@ -234,7 +236,7 @@ static void add_typesvars(SymbolsTable *table, Node *node, int function_param) {
             data = create_data(table, table->max_offset, type);
             table->max_offset += type.u.ptype == TPCInt ? 4 : 1;
             data->offset = function_param ? (-data->offset - 16) : data->offset; /* if the symbol represents a func parameter */
-            add_symbol(table, n->u.identifier, data);
+            add_symbol(table, n->u.identifier, data, n->lineno);
         }
     }
 }
@@ -254,7 +256,7 @@ static void add_declstruct(SymbolsTable *table, const Node *node) {
     assert(table);
     assert(node);
 
-    add_symbol(table, node->u.identifier, create_data(table, 0, to_tpc(node)));
+    add_symbol(table, node->u.identifier, create_data(table, 0, to_tpc(node)), node->lineno);
     sprintf(name, "%s%s", STRUCT_PREFIX, node->u.identifier);
     new_scope = add_table_child(table, name);           /* create a new scope */
     for (n = FIRSTCHILD(node); n; n = n->nextSibling) { /* add all fields of the struct to the table */
@@ -312,7 +314,7 @@ static TPCType to_tpc_ftype(SymbolsTable *table, const Node *node) {
 
     for (arg = FIRSTCHILD(tmp); arg; arg = arg->nextSibling) { /* add each arg to the ftable */
         if (type.u.ftype.argc > MAX_ARGS) {
-            fprintf(stderr, "Semantic Error: too many arguments for '%s'. Limit is 20\n", SECONDCHILD(tmp)->u.identifier);
+            fprintf(stderr, "Semantic Error, near line %d: too many arguments for '%s'. Limit is 20\n", arg->lineno, (tmp)->u.identifier);
             raise(SIGUSR1);
         }
         if (arg->kind == Primitive) {
@@ -353,7 +355,7 @@ static void add_decltypesvars(SymbolsTable *table, Node *node) {
                 add_declstruct(table, n);
                 break;
             default:
-                fprintf(stderr, "Semantic Error: invalid declaration type\n");
+                fprintf(stderr, "Semantic Error, near line %d: invalid declaration type\n", n->lineno);
                 raise(SIGUSR1);
                 break;
         }
@@ -382,7 +384,7 @@ static void add_declfoncts(SymbolsTable *table, Node *node) {
         child = add_table_child(table, buffer);
         ftype = to_tpc_ftype(child, n); /* converts the node to a functionnal type */
         data = create_data(table, 0, ftype);
-        add_symbol(table, SECONDCHILD(FIRSTCHILD(n))->u.identifier, data); /* add the function symbol to global table */
+        add_symbol(table, SECONDCHILD(FIRSTCHILD(n))->u.identifier, data, n->lineno); /* add the function symbol to global table */
 
         add_decltypesvars(child, FIRSTCHILD(SECONDCHILD(n))); /* add local symbols to the function table */
     }

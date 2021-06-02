@@ -150,7 +150,6 @@ ListExp:
 
 void sig_handler(int sig) {
     deleteTree(rootProg);
-    fclose(output);
     switch (sig) {
         case SIGUSR1:
             exit(2);

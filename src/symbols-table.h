@@ -44,7 +44,7 @@ void delete_table(SymbolsTable *table);
  * @param name the name of the researched symbols table
  * @return the table if found, NULL otherwise
 */
-SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name);
+SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name, int line);
 
 /**
  * @brief Displays a symbols tables
