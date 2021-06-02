@@ -3,8 +3,6 @@
 
 #include <stdio.h>
 
-FILE *file;
-
 #define COMMENT(s) fprintf(file, "\t; %s\n", s)
 #define LABEL(l) fprintf(file, "%s:\n", l)
 #define PUSH(r) fprintf(file, "\tpush %s\n", r)

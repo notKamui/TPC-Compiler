@@ -6,6 +6,7 @@
 #include "translation_utils.h"
 
 #define INT_MAX_DIGITS 16
+FILE *file;
 static unsigned long long labelc;
 static int in_main;
 static size_t current_func_ret_size;
@@ -440,7 +441,7 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
     if (FIRSTCHILD(self)) {
         stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable); /* add args of the function on the stack */
         /* TODO  coller params au fond de la pile puis coller rsp au dernier arg */
-        }
+    }
 
     PUSH("r9"); /* push the old rsp position on the top of the stack */
     CALL(self->u.identifier);

@@ -29,7 +29,7 @@ void delete_table(SymbolsTable *table) {
  * @param name the name of the table to fetch.
  * @return the fetched symbols table.
  */
-SymbolsTable *get_table_by_name(SymbolsTable *global, const char name[TABLE_NAME_SIZE]) {
+SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name) {
     SymbolsTable *t;
 
     assert(global);
@@ -77,7 +77,7 @@ void print_table(SymbolsTable *table) {
  * @param name the name of the table.
  * @return the created table.
 */
-static SymbolsTable *init_table(const char name[TABLE_NAME_SIZE]) {
+static SymbolsTable *init_table(const char *name) {
     SymbolsTable *table;
 
     assert(name);

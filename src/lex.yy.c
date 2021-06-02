@@ -1,6 +1,6 @@
-#line 2 "src/lex.yy.c"
+#line 1 "src/lex.yy.c"
 
-#line 4 "src/lex.yy.c"
+#line 3 "src/lex.yy.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -596,10 +596,10 @@ char *yytext;
   int lineno=1;
   int charno=0;
   char errline[1024];
-#line 600 "src/lex.yy.c"
+#line 599 "src/lex.yy.c"
 #define YY_NO_INPUT 1
 
-#line 603 "src/lex.yy.c"
+#line 602 "src/lex.yy.c"
 
 #define INITIAL 0
 #define SHORT_COMMENT 1
@@ -827,7 +827,7 @@ YY_DECL
 	{
 #line 14 "src/lexer.l"
 
-#line 831 "src/lex.yy.c"
+#line 830 "src/lex.yy.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1070,7 +1070,7 @@ YY_RULE_SETUP
 #line 62 "src/lexer.l"
 ECHO;
 	YY_BREAK
-#line 1074 "src/lex.yy.c"
+#line 1073 "src/lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(SHORT_COMMENT):
 			case YY_STATE_EOF(LONG_COMMENT):
