@@ -11,6 +11,8 @@ static unsigned long long labelc;
 static int in_main;
 static size_t current_func_ret_size;
 static size_t current_func_args_size;
+static size_t space_before_end;
+static size_t fetched_size;
 
 static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable);
 
@@ -391,7 +393,7 @@ static void assign_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable)
 static void lvalue_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
     char id[64], fetched[128];
     TPCData *data;
-    int fetched_size, data_offset;
+    int data_offset;
 
     COMMENT("get lvalue");
     strcpy(id, FIRSTCHILD(self)->u.identifier);
@@ -399,23 +401,41 @@ static void lvalue_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable)
         fetched_size = data->type.u.ptype == TPCInt ? 4 : 1;
         data_offset = data->offset > 0 ? data->offset - fetched_size : data->offset;
         printf("initial: %d\tfinal: %d\n", data->offset, data_offset);
-        sprintf(fetched, "%s [rbp - (%d)]", size_to_asmsize(fetched_size), data_offset);
+        sprintf(fetched, "%s [rbp - (%ld)]", size_to_asmsize(fetched_size), data_offset + fetched_size); /* TODO fuck this also */
         MOV(data->type.u.ptype == TPCInt ? "eax" : "al", fetched);
         PUSH("rax");
     } else { /* global */
         data = hashtable_get(gtable->self, id);
-        sprintf(fetched, "%s [%s]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), id);
+        fetched_size = data->type.u.ptype == TPCInt ? 4 : 1;
+        sprintf(fetched, "%s [%s]", size_to_asmsize(fetched_size), id);
         MOV(data->type.u.ptype == TPCInt ? "eax" : "al", fetched);
         PUSH("rax");
     }
 }
 
 static void stack_param(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    int param_size;
+    char receiver[19 + INT_MAX_DIGITS];
     assert(self);
     if (self->nextSibling) {
         stack_param(self->nextSibling, gtable, ftable);
     }
     instr(self, FunctionCall, gtable, ftable);
+    switch (self->kind) {
+        case CharLiteral:
+            param_size = 1;
+            break;
+        case LValue:
+            param_size = fetched_size;
+            break;
+        default: /* either IntLiteral or a SuiteInstr, which is always an int */
+            param_size = 4;
+            break;
+    }
+    sprintf(receiver, "%s [rsp + %ld]", size_to_asmsize(param_size), space_before_end + 8 - param_size);
+    MOV("rax", "QWORD [rsp]");
+    MOV(receiver, param_size == 4 ? "eax" : "al"); /* TODO FUCK THIS */
+    space_before_end += 8 - param_size;
 }
 
 static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
@@ -439,8 +459,12 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
     MOV("r9", "rsp"); /* saves the old rsp position before params stacking in r9 */
 
     if (FIRSTCHILD(self)) {
+        space_before_end = 0; /* init the space before the stacks end */
+
         stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable); /* add args of the function on the stack */
-        /* TODO  coller params au fond de la pile puis coller rsp au dernier arg */
+
+        sprintf(buff, "%ld", space_before_end);
+        ADD("rsp", buff); /* realigning the stack */
     }
 
     PUSH("r9"); /* push the old rsp position on the top of the stack */

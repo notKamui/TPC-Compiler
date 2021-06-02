@@ -1,20 +1,15 @@
-struct bar {
-    int x, y, z;
-};
-int mdrt;
-
-char foo(char a, char b) {
-    int x, c;
-    c = 4;
-    print(b);
+char foo(char a) {
+    print(a);
     print('\n');
     return 'z';
 }
+
 int main(void) {
-    int z;
     char a;
-    a = foo('2' + 2, 'z');
-    z = 2 + 3;
+    a = 'b';
+    print(a);
+    print('\n');
+    a = foo('c');
     print(a);
     print('\n');
     return 0;
