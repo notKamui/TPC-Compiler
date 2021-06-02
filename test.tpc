@@ -1,15 +1,21 @@
-int abso(int n) {
-    if (n > 0) {
-        return n;
-    } else {
-        return -n;
-    }
-}
+struct bar {
+    int x, y, z;
+};
+int mdrt;
 
+char foo(char a, char b) {
+    int x, c;
+    c = 4;
+    print(b);
+    print('\n');
+    return 'z';
+}
 int main(void) {
-    int a;
-    a = 0;
-    a = 2 + a;
-    a;
-    return a;
+    int z;
+    char a;
+    a = foo('2' + 2, 'z');
+    z = 2 + 3;
+    print(a);
+    print('\n');
+    return 0;
 }

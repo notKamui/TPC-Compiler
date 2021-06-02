@@ -157,7 +157,7 @@ static TPCType to_tpc(const Node *n) {
  * @param type the type of the tpc data.
  * @return the created tpc data.
 */
-static TPCData *create_data(SymbolsTable *table, const TPCType type) {
+static TPCData *create_data(SymbolsTable *table, int offset, const TPCType type) {
     TPCData *data;
 
     assert(table);
@@ -168,9 +168,10 @@ static TPCData *create_data(SymbolsTable *table, const TPCType type) {
         exit(3);
     }
     data->type = type;
-    data->offset = table->max_offset;
+    data->offset = offset;
+    /*data->offset = table->max_offset;*/
     if (type.kind == KindPrim) {
-        table->max_offset += type.u.ptype == TPCInt ? 4 : 1; /* if the type is a function or a struct then 0*/
+        /*table->max_offset += type.u.ptype == TPCInt ? 4 : 1; */ /* if the type is a function or a struct then 0*/
     }
     return data;
 }
@@ -229,14 +230,16 @@ static int add_typesvars(SymbolsTable *table, Node *node, int function_param) {
         it = hashtable_iterator_of(struct_table->self);
         while (hashtable_iterator_next(&it)) {                                    /* adding each field of the struct in the table */
             sprintf(identifier, "%s.%s", FIRSTCHILD(node)->u.identifier, it.key); /* writing the struct id */
-            data = create_data(table, it.value->type);
+            data = create_data(table, it.value->offset + table->max_offset, it.value->type);
             data->offset = function_param ? (-data->offset - 16) : data->offset; /* if the symbol represents a func parameter */
             add_symbol(table, identifier, data);
         }
+        table->max_offset += struct_table->max_offset;
     } else {
         type = to_tpc(node);
         for (n = FIRSTCHILD(node); n; n = n->nextSibling) {
-            data = create_data(table, type);
+            data = create_data(table, table->max_offset, type);
+            table->max_offset += type.u.ptype == TPCInt ? 4 : 1;
             data->offset = function_param ? (-data->offset - 16) : data->offset; /* if the symbol represents a func parameter */
             add_symbol(table, n->u.identifier, data);
         }
@@ -261,7 +264,7 @@ static int add_declstruct(SymbolsTable *table, const Node *node) {
     assert(table);
     assert(node);
 
-    add_symbol(table, node->u.identifier, create_data(table, to_tpc(node)));
+    add_symbol(table, node->u.identifier, create_data(table, 0, to_tpc(node)));
     sprintf(name, "%s%s", STRUCT_PREFIX, node->u.identifier);
     new_scope = add_table_child(table, name);           /* create a new scope */
     for (n = FIRSTCHILD(node); n; n = n->nextSibling) { /* add all fields of the struct to the table */
@@ -399,7 +402,7 @@ static int add_declfoncts(SymbolsTable *table, Node *node) {
         sprintf(buffer, "func %s", SECONDCHILD(FIRSTCHILD(n))->u.identifier);
         child = add_table_child(table, buffer);
         ftype = to_tpc_ftype(child, n); /* converts the node to a functionnal type */
-        data = create_data(table, ftype);
+        data = create_data(table, 0, ftype);
         if (!add_symbol(table, SECONDCHILD(FIRSTCHILD(n))->u.identifier, data)) { /* add the function symbol to global table */
             return 0;
         }

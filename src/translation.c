@@ -8,7 +8,8 @@
 #define INT_MAX_DIGITS 16
 static unsigned long long labelc;
 static int in_main;
-static int in_void;
+static size_t current_func_ret_size;
+static size_t current_func_args_size;
 
 static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable);
 
@@ -56,10 +57,38 @@ static void decl_typevars(Node *typevars, SymbolsTable *gtable) {
     bss(typevars, gtable);
 }
 
+static void stack_return() {
+    char stack_label[14 + INT_MAX_DIGITS], end_stack_label[18 + INT_MAX_DIGITS], tmp[27 + INT_MAX_DIGITS];
+    int local_label;
+
+    local_label = labelc;
+    labelc++;
+    sprintf(stack_label, "STACK_RETURN%d", local_label);
+    sprintf(end_stack_label, "END_STACK_RETURN%d", local_label);
+    sprintf(tmp, "%ld", current_func_ret_size); /* copy the size of the return type */
+
+    COMMENT("add return value in stack");
+    MOV("rax", tmp); /* size of return */
+    LABEL(stack_label);
+    /* stop condition */
+    CMP("rax", "0");
+    JE(end_stack_label);
+    MOV("r9", tmp);
+    SUB("r9", "rax");
+    MOV("bl", "BYTE [rsp + r9]");
+    sprintf(tmp, "%ld", 24 + current_func_ret_size + current_func_args_size);
+    MOV("r9", tmp);
+    SUB("r9", "rax");
+    MOV("BYTE [rbp + r9]", "bl");
+    SUB("rax", "1");
+    JMP(stack_label);
+    LABEL(end_stack_label);
+}
+
 static void return_instr() {
     COMMENT("instr return 1st part");
     if (in_main) {
-        POP("rdi");
+        MOV("edi", "DWORD [rsp]");
         COMMENT("stack realign");
         MOV("rsp", "rbp");
         POP("rbp");
@@ -67,8 +96,8 @@ static void return_instr() {
         MOV("rax", "60");
         SYSCALL();
     } else {
-        if (!in_void) {
-            POP("rax");  // TODO
+        if (current_func_ret_size > 0) {
+            stack_return();
             COMMENT("stack realign");
             MOV("rsp", "rbp");
             POP("rbp");
@@ -233,6 +262,7 @@ static void while_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) 
     sprintf(while_label, "WHILE%d", local_label);
     sprintf(endwhile_label, "ENDWHILE%d", local_label);
     LABEL(while_label);
+    /* comparison */
     instr(FIRSTCHILD(self), While, gtable, ftable);
     POP("rax");
     CMP("rax", "0");
@@ -295,32 +325,80 @@ static void read_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
     }
 }
 
+static void local_assign(TPCData *receiver_data) {
+    char receiver_name[21 + INT_MAX_DIGITS];
+    char assign_label[9 + INT_MAX_DIGITS], end_assign_label[13 + INT_MAX_DIGITS], tmp[27 + INT_MAX_DIGITS];
+    int local_label;
+    int receiver_size;
+
+    if (receiver_data->type.kind == KindPrim) { /* Primitive */
+        receiver_size = receiver_data->type.u.ptype == TPCInt ? 4 : 1;
+        POP("rax");
+        sprintf(receiver_name, "%s [rbp - (%d)]", size_to_asmsize(receiver_size), receiver_data->offset + receiver_size);
+        MOV(receiver_name, receiver_data->type.u.ptype == TPCInt ? "eax" : "al");
+    } else { /* Struct */
+        local_label = labelc;
+        labelc++;
+        sprintf(assign_label, "ASSING%d", local_label);
+        sprintf(end_assign_label, "END_ASSIGN%d", local_label);
+        sprintf(tmp, "%d", receiver_data->offset);
+
+        COMMENT("add return value in stack");
+        MOV("rax", tmp);
+        LABEL(assign_label);
+
+        CMP("rax", "0");
+        JE(end_assign_label);
+        MOV("r9", tmp);
+        SUB("r9", "rax");
+        MOV("bl", "BYTE [rsp + r9]");
+        sprintf(tmp, "%ld", 24 + current_func_ret_size + current_func_args_size);
+        MOV("r9", tmp);
+        SUB("r9", "rax");
+        MOV("BYTE [rbp + r9]", "bl");
+        SUB("rax", "1");
+        JMP(assign_label);
+        LABEL(end_assign_label);
+    }
+}
+
+static void global_assign(TPCData *receiver_data, const char *id) {
+    char receiver_name[9 + 2 * ID_SIZE];
+    if (receiver_data->type.kind == KindPrim) { /* Primitive */
+        POP("rax");
+        sprintf(receiver_name, "%s [%s]", size_to_asmsize(receiver_data->type.u.ptype == TPCInt ? 4 : 1), id);
+        MOV(receiver_name, receiver_data->type.u.ptype == TPCInt ? "eax" : "al");
+    } else { /* Struct */
+    }
+}
+
 static void assign_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
-    char id[ID_SIZE], receiver[16 + INT_MAX_DIGITS + ID_SIZE];
+    char id[ID_SIZE];
     TPCData *data;
 
     instr(SECONDCHILD(self), Assign, gtable, ftable);
     COMMENT("instr assignment");
-    POP("rax");
     strcpy(id, FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
     if ((data = hashtable_get(ftable->self, id)) != NULL) { /* local */
-        sprintf(receiver, "%s [rbp - (%d)]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
-        MOV(receiver, data->type.u.ptype == TPCInt ? "eax" : "al");
+        local_assign(data);
     } else { /* global */
         data = hashtable_get(gtable->self, id);
-        sprintf(receiver, "%s [%s]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), id);
-        MOV(receiver, data->type.u.ptype == TPCInt ? "eax" : "al");
+        global_assign(data, id);
     }
 }
 
 static void lvalue_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
     char id[64], fetched[128];
     TPCData *data;
+    int fetched_size, data_offset;
 
-    COMMENT("get value");
+    COMMENT("get lvalue");
     strcpy(id, FIRSTCHILD(self)->u.identifier);
     if ((data = hashtable_get(ftable->self, id)) != NULL) { /* local */
-        sprintf(fetched, "%s [rbp - (%d)]", size_to_asmsize(data->type.u.ptype == TPCInt ? 4 : 1), data->offset);
+        fetched_size = data->type.u.ptype == TPCInt ? 4 : 1;
+        data_offset = data->offset > 0 ? data->offset - fetched_size : data->offset;
+        printf("initial: %d\tfinal: %d\n", data->offset, data_offset);
+        sprintf(fetched, "%s [rbp - (%d)]", size_to_asmsize(fetched_size), data_offset);
         MOV(data->type.u.ptype == TPCInt ? "eax" : "al", fetched);
         PUSH("rax");
     } else { /* global */
@@ -344,9 +422,8 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
     TPCData *data;
     SymbolsTable *t;
 
-    MOV("r9", "rsp"); /* saves the old rsp position before params stacking in r9 */
-
     data = hashtable_get(gtable->self, self->u.identifier);
+    assert(data);
     if (!data->type.u.ftype.no_ret) {
         if (data->type.u.ftype.return_type.kind == KindPrim) {
             strcpy(buff, data->type.u.ftype.return_type.u.ptype == TPCInt ? "4" : "1");
@@ -358,15 +435,18 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
         }
         SUB("rsp", buff); /* allocates the memory for the function return in the stack */
     }
-    stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable); /* add args of the function on the stack */
+    MOV("r9", "rsp"); /* saves the old rsp position before params stacking in r9 */
+
+    if (FIRSTCHILD(self)) {
+        stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable); /* add args of the function on the stack */
+        /* TODO  coller params au fond de la pile puis coller rsp au dernier arg */
+        }
 
     PUSH("r9"); /* push the old rsp position on the top of the stack */
     CALL(self->u.identifier);
     POP("rsp");
     if (last_eff_kind == SuiteInstr) {
         ADD("rsp", buff); /* buff is always the return size here ; disallocates the unusable returned value */
-    } else {
-        PUSH("rax");
     }
 }
 
@@ -469,9 +549,30 @@ static void decl_vars(Node *declvars, SymbolsTable *ftable) {
     }
 }
 
+static size_t return_size(Node *fonct, SymbolsTable *gtable) {
+    Node *ret;
+    SymbolsTable *table;
+    char struct_name[TABLE_NAME_SIZE];
+
+    ret = FIRSTCHILD(FIRSTCHILD(fonct));
+    if (ret->kind == Primitive) {
+        return prim_to_size(ret->u.identifier);
+    } else if (ret->kind == Struct) {
+        sprintf(struct_name, "struct %s", ret->u.identifier);
+        table = get_table_by_name(gtable, struct_name);
+        assert(table);
+        return table->max_offset;
+    } else {
+        return 0;
+    }
+}
+
 static void decl_fonct(Node *fonct, SymbolsTable *gtable) {
     char name[69];
     SymbolsTable *ftable;
+
+    assert(gtable);
+
     sprintf(name, "func %s", SECONDCHILD(FIRSTCHILD(fonct))->u.identifier);
     ftable = get_table_by_name(gtable, name);
     assert(ftable);
@@ -485,7 +586,8 @@ static void decl_fonct(Node *fonct, SymbolsTable *gtable) {
 
     // suiteinstr
     in_main = strcmp(name, "func main") == 0;
-    in_void = FIRSTCHILD(FIRSTCHILD(fonct))->kind == Void;
+    current_func_ret_size = return_size(fonct, gtable);
+    current_func_args_size = ftable->max_offset;
     if (suite_instr(SECONDCHILD(SECONDCHILD(fonct)), gtable, ftable) == 0) {
         COMMENT("stack realign");
         MOV("rsp", "rbp");
