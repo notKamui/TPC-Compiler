@@ -1,5 +1,5 @@
 CC=gcc
-OBJ=abstract-tree.o symbols-table.o symbol.o hashtable.o translation.o translation_utils.o lex.yy.o
+OBJ=abstract-tree.o symbols-table.o symbol.o hashtable.o translation.o translation_utils.o sem-err.o lex.yy.o
 CFLAGS=-Wall -ly -lfl -pedantic -g
 EXEC=tpcc
 PARSER=parser

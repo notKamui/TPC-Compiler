@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 extern int lineno; /* from lexer */
+extern int charno;
+extern int yyleng;
 
 static const char *StringFromKind[] = {
     "Prog", "DeclFoncts", "DeclFonct", "EnTeteFonct", "Parametres",
@@ -26,6 +28,7 @@ Node *makeNode(Kind kind) {
     node->kind = kind;
     node->firstChild = node->nextSibling = NULL;
     node->lineno = lineno;
+    node->charno = charno - yyleng;
     return node;
 }
 

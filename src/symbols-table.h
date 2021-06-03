@@ -31,7 +31,7 @@ typedef struct symbols {
  * @param root the root of the abstract tree of the program
  * @return the created symbols table
 */
-SymbolsTable *create_table(Node *root);
+SymbolsTable *create_table(Node *root, const char *path);
 
 /**
  * @brief Frees the memory used by a symbols table
@@ -45,7 +45,7 @@ void delete_table(SymbolsTable *table);
  * @param name the name of the researched symbols table
  * @return the table if found, NULL otherwise
 */
-SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name, int line);
+SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name, int lineno, int charno);
 
 /**
  * @brief Displays a symbols tables

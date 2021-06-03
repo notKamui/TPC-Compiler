@@ -1,6 +1,10 @@
+struct non {
+    int x, y;
+};
+struct non xd, mdr;
+
 int main(void) {
-    if (5 <= 6) {
-        return 1;
-    }
-    return 0;
+    int a;
+    a = 5;
+    return a;
 }

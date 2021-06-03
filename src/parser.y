@@ -215,7 +215,7 @@ int main(int argc, char** argv) {
 
     int ret = yyparse();
     if (ret) exit(1);
-    table = create_table(rootProg);
+    table = create_table(rootProg, argv[optind]);
 
     if (showAST) {
         printTree(rootProg);
@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
             delete_table(table);
             raise(SIGUSR2);
         }
-        write_nasm(output, rootProg, table);
+        write_nasm(argv[optind], output, rootProg, table);
         fclose(output);
     }
 

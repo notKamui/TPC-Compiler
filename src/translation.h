@@ -6,6 +6,6 @@
 #include "abstract-tree.h"
 #include "symbols-table.h"
 
-void write_nasm(FILE *f, Node *prog, SymbolsTable *table);
+void write_nasm(const char *source, FILE *f, Node *prog, SymbolsTable *table);
 
 #endif

@@ -52,6 +52,7 @@ typedef struct Node {
     } u;
     struct Node *firstChild, *nextSibling;
     int lineno;
+    int charno;
 } Node;
 
 Node *makeNode(Kind kind);
