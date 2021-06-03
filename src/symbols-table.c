@@ -216,6 +216,7 @@ static void add_typesvars(SymbolsTable *table, Node *node, int function_param) {
     HashTableIterator it;
     char table_name[TABLE_NAME_SIZE];
     char identifier[2 * ID_SIZE + 1];
+    int offset;
 
     assert(table);
     assert(node);
@@ -229,7 +230,12 @@ static void add_typesvars(SymbolsTable *table, Node *node, int function_param) {
             add_symbol(table, n->u.identifier, data, node->lineno, node->charno);
             while (hashtable_iterator_next(&it)) {                     /* adding each field of the struct in the table */
                 sprintf(identifier, "%s.%s", n->u.identifier, it.key); /* writing the struct id */
-                data = create_data(table, it.value->offset + table->max_offset, it.value->type);
+                if (table->parent == NULL) {
+                    offset = it.value->offset;
+                } else {
+                    offset = (struct_table->max_offset - it.value->offset - (it.value->type.u.ptype == TPCChar ? 1 : 4)) + table->max_offset;
+                }
+                data = create_data(table, offset, it.value->type);
                 if (function_param) { /* if the symbol represents a func parameter */
                     data->offset = -data->offset - 16;
                     table->args_size += it.value->type.u.ptype == TPCInt ? 4 : 1;

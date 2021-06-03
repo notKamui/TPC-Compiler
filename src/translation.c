@@ -18,6 +18,7 @@ static unsigned long long labelc;
 static int in_main;
 static size_t current_func_ret_size;
 static size_t current_func_args_size;
+TPCData *current_func;
 
 static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable);
 
@@ -25,7 +26,6 @@ static void decl_types(Node *type, SymbolsTable *gtable) {
     char str_type[10];
     Node *n;
     char tmp[71];
-    HashTableIterator it;
     SymbolsTable *t;
 
     if (type->kind == Primitive) {
@@ -339,7 +339,7 @@ static void read_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
     }
 }
 
-/* err sem à faire */
+/* TODO err sem à faire */
 static void loc_prim_name(char *fetched, TPCData *data) {
     int fetched_size, data_offset;
 
@@ -351,18 +351,22 @@ static void loc_prim_name(char *fetched, TPCData *data) {
     sprintf(fetched, "%s [rbp - (%d)]", size_to_asmsize(fetched_size), data_offset);
 }
 
-/* err sem à faire */
+/* TODO err sem à faire */
 static void glob_prim_name(char *fetched, TPCData *data, const char *id) {
     int fetched_size;
+    char buff[2 * ID_SIZE + 1];
 
     assert(fetched);
     assert(data);
 
-    if (data->type.kind != KindPrim) {
+    strcpy(buff, id);
+    if (strcmp(id, strtok(buff, ".")) != 0) {
+        fetched_size = data->type.u.ptype == TPCInt ? 4 : 1;
+        sprintf(fetched, "%s [%s + %d]", size_to_asmsize(fetched_size), buff, data->offset);
+    } else {
+        fetched_size = data->type.u.ptype == TPCInt ? 4 : 1;
+        sprintf(fetched, "%s [%s]", size_to_asmsize(fetched_size), id);
     }
-
-    fetched_size = data->type.u.ptype == TPCInt ? 4 : 1;
-    sprintf(fetched, "%s [%s]", size_to_asmsize(fetched_size), id);
 }
 
 static void prim_lvalue_name(char *fetched, Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
@@ -424,8 +428,45 @@ static void compare_types(TPCData *ldata, Node *rvalue, SymbolsTable *gtable, Sy
                 raise(SIGUSR1);
                 break;
         }
+    } else if (ldata->type.kind == KindFunction) {
+        if (rdata->type.kind == KindPrim) {
+            if (ldata->type.u.ftype.return_type.kind == KindStruct) {
+                print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "invalid type, expected struct %s, got %s\n", ldata->type.u.ftype.return_type.u.struct_name, rdata->type.u.ptype == TPCInt ? "int" : "char");
+                raise(SIGUSR1);
+            }
+            if (rdata->type.u.ptype == TPCInt && ldata->type.u.ftype.return_type.kind == KindPrim && ldata->type.u.ftype.return_type.u.ptype == TPCChar) {
+                print_err(source_fname, WARNING, rvalue->lineno, rvalue->charno, "implicit cast, expected char, got int\n");
+            }
+        } else {
+            if (ldata->type.u.ftype.return_type.kind == KindPrim) {
+                print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "invalid type, expected %s, got struct %s\n", ldata->type.u.ftype.return_type.u.ptype == TPCInt ? "int" : "char", rdata->type.u.struct_name);
+                raise(SIGUSR1);
+            }
+            if (strcmp(ldata->type.u.ftype.return_type.u.struct_name, rdata->type.u.struct_name) != 0) {
+                print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "invalid type, expected struct %s, got struct %s\n", ldata->type.u.ftype.return_type.u.struct_name, rdata->type.u.struct_name);
+                raise(SIGUSR1);
+            }
+        }
     } else { /* left value type == struct */
-        /* TODO ici affectation de struct */
+        if (rdata->type.kind == KindPrim) {
+            print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "invalid type, expected struct %s, got %s\n", ldata->type.u.struct_name, rdata->type.u.ptype == TPCInt ? "int" : "char");
+            raise(SIGUSR1);
+        } else if (rdata->type.kind == KindStruct) {
+            if (strcmp(ldata->type.u.struct_name, rdata->type.u.struct_name) != 0) {
+                print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "invalid type, expected struct %s, got struct %s\n", ldata->type.u.struct_name, rdata->type.u.struct_name);
+                raise(SIGUSR1);
+            }
+        } else if (rdata->type.kind == KindFunction) { /* right = KindFunction */
+            if (rdata->type.u.ftype.return_type.kind == KindStruct) {
+                if (strcmp(ldata->type.u.struct_name, rdata->type.u.ftype.return_type.u.struct_name) != 0) {
+                    print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "invalid type, expected struct %s, got struct %s\n", ldata->type.u.struct_name, rdata->type.u.ftype.return_type.u.struct_name);
+                    raise(SIGUSR1);
+                }
+            } else {
+                print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "invalid type, expected struct %s, got %s\n", ldata->type.u.struct_name, rdata->type.u.ftype.return_type.u.ptype == TPCInt ? "int" : "char");
+                raise(SIGUSR1);
+            }
+        }
     }
 }
 
@@ -474,13 +515,17 @@ static void prim_assign(TPCData *ldata, const char *lvalue_s, Node *rvalue, Symb
     MOV(lvalue_s, rvalue_content);
 }
 
-static void struct_assign(TPCData *ldata, Node *rvalue, SymbolsTable *gtable, SymbolsTable *ftable, int l_global) {
+static void struct_assign(TPCData *ldata, Node *rvalue, SymbolsTable *gtable, SymbolsTable *ftable, char *l_global_name) {
     char struct_assign[1 + INT_MAX_DIGITS], end_struct_assign[20 + INT_MAX_DIGITS];
-    char buff[TABLE_NAME_SIZE];
+    char buff[TABLE_NAME_SIZE + 16];
     int local_label, offset;
     TPCData *rdata;
     SymbolsTable *struct_table;
 
+    if (rvalue->kind != LValue && rvalue->kind != FunctionCall) {
+        print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "invalid type, expected struct %s, got %s\n", ldata->type.u.struct_name, rvalue->kind == IntLiteral ? "int" : "char");
+        raise(SIGUSR1);
+    }
     compare_types(ldata, rvalue, gtable, ftable);
 
     local_label = labelc;
@@ -491,42 +536,58 @@ static void struct_assign(TPCData *ldata, Node *rvalue, SymbolsTable *gtable, Sy
 
     sprintf(buff, "struct %s", ldata->type.u.struct_name);
     struct_table = get_table_by_name(gtable, buff, rvalue->lineno, rvalue->charno);
-    sprintf(buff, "%d", struct_table->max_offset);
 
-    MOV("rax", buff); /* size of the struct */
+    MOV("rax", "0"); /* size of the struct */
     LABEL(struct_assign);
-    CMP("rax", "0"); /* stop condition */
-    JL(end_struct_assign);
+    sprintf(buff, "%d", struct_table->max_offset - 1);
+    CMP("rax", buff); /* stop condition */
+    JG(end_struct_assign);
 
     if ((rdata = hashtable_get(ftable->self, FIRSTCHILD(rvalue)->u.identifier)) != NULL) { /* local */
-        MOV("r9", "rbp");                                                                  /* copy the struct size in r9 */
-        ADD("r9", "rax");                                                                  /* move to the next byte to copy */
-        offset = rdata->offset >= 0 ? rdata->offset + struct_table->max_offset : rdata->offset;
-        printf("%d\n", offset);
-        sprintf(buff, "%d", offset);
-        SUB("r9", buff);                                                                          /* remove the offset */
+        MOV("r9", "rbp");
+        sprintf(buff, "%d", rdata->offset);
+        if (rdata->offset >= 0) {
+            SUB("r9", "rax"); /* move to the next byte to copy */
+            SUB("r9", "1");
+            SUB("r9", buff);
+        } else {
+            SUB("r9", "rax");
+            SUB("r9", buff);
+        }
+        /* remove the offset */
         MOV("bl", "BYTE [r9]");                                                                   /* copy the byte in al */
     } else if ((rdata = hashtable_get(gtable->self, FIRSTCHILD(rvalue)->u.identifier)) != NULL) { /* global */
-
+        sprintf(buff, "%d", struct_table->max_offset - 1);
+        MOV("r9", buff);
+        SUB("r9", "rax");
+        sprintf(buff, "BYTE [%s + rax]", FIRSTCHILD(rvalue)->u.identifier); /* remove the offset */
+        MOV("bl", buff);
     } else {
         print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "unknown symbol %s\n", FIRSTCHILD(rvalue)->u.identifier);
         raise(SIGUSR1);
     }
 
-    if (l_global) {
-        /* todo */
+    if (l_global_name) {
+        sprintf(buff, "%d", struct_table->max_offset - 1);
+        MOV("r9", buff);
+        SUB("r9", "rax");
+        sprintf(buff, "BYTE [%s + r9]", l_global_name); /* remove the offset */
+        MOV(buff, "bl");
     } else {
-        MOV("r9", "rbp"); /* copy the struct size in r9 */
-        ADD("r9", "rax"); /* move to the next byte to copy */
-        offset = ldata->offset >= 0 ? ldata->offset + struct_table->max_offset : ldata->offset;
-        printf("%d\n", offset);
-        sprintf(buff, "%d", offset);
-        SUB("r9", buff); /* remove the offset */
-
+        MOV("r9", "rbp");
+        sprintf(buff, "%d", ldata->offset);
+        if (ldata->offset >= 0) {
+            SUB("r9", "rax"); /* move to the next byte to copy */
+            SUB("r9", "1");
+            SUB("r9", buff);
+        } else {
+            SUB("r9", "rax");
+            SUB("r9", buff);
+        }
         MOV("BYTE [r9]", "bl");
     }
 
-    SUB("rax", "1");
+    ADD("rax", "1");
     JMP(struct_assign);
     LABEL(end_struct_assign);
 }
@@ -547,23 +608,20 @@ static void assign_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable)
             loc_prim_name(lvalue, data);
             prim_assign(data, lvalue, SECONDCHILD(self), gtable, ftable);
         } else {
-            struct_assign(data, SECONDCHILD(self), gtable, ftable, 0);
+            struct_assign(data, SECONDCHILD(self), gtable, ftable, NULL);
         }
     } else if ((data = hashtable_get(gtable->self, id)) != NULL) { /* global */
         if (data->type.kind == KindPrim) {
             glob_prim_name(lvalue, data, id);
             prim_assign(data, lvalue, SECONDCHILD(self), gtable, ftable);
         } else {
-            struct_assign(data, SECONDCHILD(self), gtable, ftable, 1);
+            struct_assign(data, SECONDCHILD(self), gtable, ftable, id);
         }
     } else {
     }
 }
 
-/**
- * RENOMMER CETTE MERDE "place_on_top"
-*/
-static void lvalue_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+static void place_on_top(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
     char id[64], fetched[128];
     TPCData *data;
     int fetched_size, data_offset;
@@ -578,7 +636,7 @@ static void lvalue_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable)
             MOV(data->type.u.ptype == TPCInt ? "eax" : "al", fetched);
             PUSH("rax");
         } else {
-            /**
+            /** TODO
              * 1 - trouver la taille de la struct et sub rsp de sa taille
              * 2 - faire un while pour mov les bytes 1 par 1
              * 3 - être content d'avoir réussi
@@ -586,9 +644,7 @@ static void lvalue_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable)
         }
     } else if ((data = hashtable_get(gtable->self, id)) != NULL) { /* global */
         if (data->type.kind == KindPrim) {
-            COMMENT("push rvalue");
-            fetched_size = data->type.u.ptype == TPCInt ? 4 : 1;
-            sprintf(fetched, "%s [%s]", size_to_asmsize(fetched_size), id);
+            glob_prim_name(fetched, data, id);
             MOV(data->type.u.ptype == TPCInt ? "eax" : "al", fetched);
             PUSH("rax");
         }
@@ -751,6 +807,34 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
     }
 }
 
+static void return_check(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    if (current_func->type.u.ftype.no_ret && FIRSTCHILD(self) != NULL) {
+        print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "unexpected return value in void function\n");
+        raise(SIGUSR1);
+    }
+    switch (FIRSTCHILD(self)->kind) {
+        case CharLiteral:
+            if (current_func->type.u.ftype.return_type.kind == KindStruct) {
+                print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "invalid return type, expected struct %s, got char\n", current_func->type.u.ftype.return_type.u.struct_name);
+                raise(SIGUSR1);
+            }
+            break;
+        case LValue:
+            compare_types(current_func, FIRSTCHILD(self), gtable, ftable);
+            break;
+        default: /* IntLiteral or evaluates to int */
+            if (current_func->type.u.ftype.return_type.kind == KindPrim) {
+                if (current_func->type.u.ftype.return_type.u.ptype == TPCChar) {
+                    print_err(source_fname, WARNING, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "implicit cast on return type, expected char, got int\n", current_func->type.u.ftype.return_type.u.struct_name);
+                }
+            } else {
+                print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "invalid return type, expected struct %s, got int\n", current_func->type.u.ftype.return_type.u.struct_name);
+                raise(SIGUSR1);
+            }
+            break;
+    }
+}
+
 static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
     assert(self);
     assert(gtable);
@@ -763,6 +847,7 @@ static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTa
             instr(FIRSTCHILD(self), self->kind, gtable, ftable);
             break;
         case Return:
+            return_check(self, gtable, ftable);
             instr(FIRSTCHILD(self), self->kind, gtable, ftable);
             return_instr();
             return 1;
@@ -821,7 +906,7 @@ static int instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTa
             break;
         case LValue:
             if (last_eff_kind == SuiteInstr) break;
-            lvalue_instr(self, gtable, ftable);
+            place_on_top(self, gtable, ftable);
             break;
         case FunctionCall:
             functioncall_instr(self, last_eff_kind, gtable, ftable);
@@ -874,6 +959,9 @@ static void decl_fonct(Node *fonct, SymbolsTable *gtable) {
     LABEL(&(*(name + 5)));
     PUSH("rbp");
     MOV("rbp", "rsp");
+
+    current_func = hashtable_get(gtable->self, SECONDCHILD(FIRSTCHILD(fonct))->u.identifier);
+    assert(current_func);
 
     // declvars
     decl_vars(FIRSTCHILD(SECONDCHILD(fonct)), ftable);

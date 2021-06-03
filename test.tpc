@@ -1,10 +1,23 @@
 struct non {
     int x, y;
 };
-struct non xd, mdr;
+
+struct non test;
+
+void coucou(void) {
+    struct non allo;
+    allo.y = 100;
+    test = allo;
+}
 
 int main(void) {
-    int a;
-    a = 5;
-    return a;
+    struct non a, b;
+    b.y = 50;
+    b.x = 5;
+    a = b;
+    a.y = a.y + 2;
+
+    coucou();
+
+    return test.y;
 }

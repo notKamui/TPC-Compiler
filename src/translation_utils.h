@@ -17,7 +17,7 @@
 #define CMP(r1, r2) fprintf(file, "\tcmp %s, %s\n", r1, r2)
 #define JMP(l) fprintf(file, "\tjmp %s\n", l)
 #define JE(l) fprintf(file, "\tje %s\n", l)
-#define JL(l) fprintf(file, "\tjl %s\n", l)
+#define JG(l) fprintf(file, "\tjg %s\n", l)
 #define SETZ(r) fprintf(file, "\tsetz %s\n", r)
 #define SETNZ(r) fprintf(file, "\tsetnz %s\n", r)
 #define SETS(r) fprintf(file, "\tsets %s\n", r)
