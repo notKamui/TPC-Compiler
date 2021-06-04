@@ -20,7 +20,7 @@ It only exists as a very interesting exercise on syntax analysis, finite state m
 The grammar of the language is defined in `./src/parser.y`.
 
 It has no data structures except for `struct`s (which are non recursive nor nested), and has no `for` loops, nor pointers.
-The only two primitives are `int` and `char`. The rest of the syntax is vastly equivalent to that C.
+The only two primitives are `int` and `char`, and the only control flow instructions are `if`, `else`, and `while`. The rest of the syntax is vastly equivalent to that of C.
 
 ### Requirements
 
