@@ -10,7 +10,7 @@
 #define NOT_FUNCTION_PARAM 0
 #define DEFAULT_ARGS_OFFSET 8
 
-char source_fname[64];
+char source_file[64];
 
 /**
  * @brief Deletes and frees a symbol table.
@@ -45,7 +45,7 @@ SymbolsTable *get_table_by_name(SymbolsTable *global, const char *name, int line
             return t;
         }
     }
-    print_err(source_fname, SEM_ERR, lineno, charno, "unknown symbol '%s'\n", name);
+    print_err(source_file, SEM_ERR, lineno, charno, "unknown symbol '%s'\n", name);
     raise(SIGUSR1);
     return NULL;
 }
@@ -192,7 +192,7 @@ static void add_symbol(SymbolsTable *table, const char identifier[ID_SIZE], TPCD
     assert(data);
 
     if (hashtable_get(table->self, identifier) != NULL) { /* to catch multiple declarations */
-        print_err(source_fname, SEM_ERR, lineno, charno, "symbol '%s' already defined\n", identifier);
+        print_err(source_file, SEM_ERR, lineno, charno, "symbol '%s' already defined\n", identifier);
         raise(SIGUSR1);
     }
 
@@ -333,7 +333,7 @@ static TPCType to_tpc_ftype(SymbolsTable *table, const Node *node) {
 
     for (arg = FIRSTCHILD(tmp); arg; arg = arg->nextSibling) { /* add each arg to the ftable */
         if (type.u.ftype.argc > MAX_ARGS) {
-            print_err(source_fname, SEM_ERR, arg->lineno, arg->charno, "too many arguments for '%s'. Limit is 20\n", (tmp)->u.identifier);
+            print_err(source_file, SEM_ERR, arg->lineno, arg->charno, "too many arguments for '%s'. Limit is 20\n", (tmp)->u.identifier);
             raise(SIGUSR1);
         }
         if (arg->kind == Primitive) {
@@ -374,7 +374,7 @@ static void add_decltypesvars(SymbolsTable *table, Node *node) {
                 add_declstruct(table, n);
                 break;
             default:
-                print_err(source_fname, SEM_ERR, n->lineno, n->charno, "invalid declaration type\n");
+                print_err(source_file, SEM_ERR, n->lineno, n->charno, "invalid declaration type\n");
                 raise(SIGUSR1);
                 break;
         }
@@ -417,7 +417,7 @@ static void add_declfoncts(SymbolsTable *table, Node *node) {
 SymbolsTable *create_table(Node *root, const char *path) {
     SymbolsTable *table;
 
-    strcpy(source_fname, path);
+    strcpy(source_file, path);
 
     table = init_table(GLOBAL);
 

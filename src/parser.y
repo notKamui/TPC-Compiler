@@ -16,7 +16,7 @@
   struct Node* rootProg;
   SymbolsTable* table;
   FILE *output;
-  char source_fname[64];
+  char source_filename[64];
   char fname[64];
   int is_anon = 0;
 %}
@@ -156,7 +156,7 @@ void sig_handler(int sig) {
     deleteTree(rootProg);
     remove(fname);
     if (is_anon) {
-        remove(source_fname);
+        remove(source_filename);
     }
     switch (sig) {
         case SIGUSR1:
@@ -205,8 +205,8 @@ int main(int argc, char** argv) {
     }
 
     if (optind == argc - 1) {
-        strcpy(source_fname, argv[optind]);
-        file = fopen(source_fname, "r");
+        strcpy(source_filename, argv[optind]);
+        file = fopen(source_filename, "r");
         if (file == NULL) {
             fprintf(stderr, "Error: File not found\n");
             exit(3);
@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
         dup2(fileno(file), STDIN_FILENO);
         fclose(file);
 
-        strcpy(cut, source_fname);;
+        strcpy(cut, source_filename);;
         tmp = strtok(cut, "/");
         while (tmp != NULL) {
             tmp = strtok(NULL, "/");
@@ -223,15 +223,15 @@ int main(int argc, char** argv) {
         strcpy(fname, strtok(cut, "."));
     } else {
         is_anon = 1;
-        strcpy(source_fname, "_anonymous.tpc");
+        strcpy(source_filename, "_anonymous.tpc");
         strcpy(fname, "_anonymous");
 
-        fno = open(source_fname, O_CREAT | O_RDWR | O_TRUNC);
+        fno = open(source_filename, O_CREAT | O_RDWR | O_TRUNC);
         while ((size = read(STDIN_FILENO, buf, 128)) > 0) {
             write(fno, buf, size);
         }
         close(fno);
-        file = fopen(source_fname, "r");
+        file = fopen(source_filename, "r");
         if (file == NULL) {
             fprintf(stderr, "Error: File not found\n");
             exit(3);
@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
     int ret = yyparse();
     if (ret) exit(1);
     
-    table = create_table(rootProg, source_fname);
+    table = create_table(rootProg, source_filename);
     if (showAST) {
         printTree(rootProg);
     }
@@ -259,7 +259,7 @@ int main(int argc, char** argv) {
         delete_table(table);
         raise(SIGUSR2);
     }
-    write_nasm(source_fname, output, rootProg, table);
+    write_nasm(source_filename, output, rootProg, table);
     fclose(output);
 
     if (withExecutable) {
@@ -276,7 +276,7 @@ int main(int argc, char** argv) {
     } 
 
     if (is_anon) {
-        remove(source_fname);
+        remove(source_filename);
     }
     delete_table(table);
     deleteTree(rootProg);
