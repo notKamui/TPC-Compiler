@@ -230,16 +230,15 @@ static void add_typesvars(SymbolsTable *table, Node *node, int function_param) {
             add_symbol(table, n->u.identifier, data, node->lineno, node->charno);
             while (hashtable_iterator_next(&it)) {                     /* adding each field of the struct in the table */
                 sprintf(identifier, "%s.%s", n->u.identifier, it.key); /* writing the struct id */
-                if (table->parent == NULL) {
+                if (table->parent == NULL) {                           /* struct declaration in global */
                     offset = it.value->offset;
+                } else if (function_param) { /* if the symbol represents a func parameter */
+                    offset = -it.value->offset - 24;
+                    table->args_size += it.value->type.u.ptype == TPCInt ? 4 : 1;
                 } else {
                     offset = (struct_table->max_offset - it.value->offset - (it.value->type.u.ptype == TPCChar ? 1 : 4)) + table->max_offset;
                 }
                 data = create_data(table, offset, it.value->type);
-                if (function_param) { /* if the symbol represents a func parameter */
-                    data->offset = -data->offset - 16;
-                    table->args_size += it.value->type.u.ptype == TPCInt ? 4 : 1;
-                }
                 add_symbol(table, identifier, data, node->lineno, node->charno);
             }
 

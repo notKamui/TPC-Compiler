@@ -6,6 +6,7 @@
   #include "parser.tab.h"
   int lineno=1;
   int charno=0;
+  int prevno=0;
   char errline[1024];
 %}
 
@@ -33,7 +34,7 @@ if			{ charno += yyleng;return IF; }
 else			{ charno += yyleng;return ELSE; }
 while			{ charno += yyleng;return WHILE; }
 return			{ charno += yyleng;return RETURN; }
-[a-zA-Z_][a-zA-Z0-9_]*	{ charno += yyleng; strcpy(yylval.Identifier, yytext); return IDENT; }
+[a-zA-Z_][a-zA-Z0-9_]*	{ charno += yyleng - 1; strcpy(yylval.Identifier, yytext); return IDENT; }
 [0-9]+			{ charno += yyleng; yylval.IntLiteral = atoi(yytext); return NUM;}
 '\\?.'			{ 
   charno += yyleng;

@@ -1,23 +1,20 @@
-struct non {
-    int x, y;
+struct foo {
+    int a;
 };
 
-struct non test;
-
-void coucou(void) {
-    struct non allo;
-    allo.y = 100;
-    test = allo;
+struct foo bar(struct foo x) {
+    return x;
 }
 
 int main(void) {
-    struct non a, b;
-    b.y = 50;
-    b.x = 5;
-    a = b;
-    a.y = a.y + 2;
+    char c, d;
+    int x;
+    struct foo xd;
 
-    coucou();
+    while (x > c) {
+        print('a');
+        print('\n');
+    }
 
-    return test.y;
+    return x;
 }
