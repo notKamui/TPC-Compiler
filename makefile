@@ -8,8 +8,8 @@ LEXER=lexer
 all : makedirs $(EXEC)
 
 makedirs:
-	@mkdir bin
-	@mkdir obj
+	@mkdir -p bin
+	@mkdir -p obj
 
 $(EXEC): $(PARSER).tab.c $(OBJ) 
 	$(CC) src/$(PARSER).tab.c $(OBJ:%.o=obj/%.o) -o bin/$(EXEC)

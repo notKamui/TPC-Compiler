@@ -217,6 +217,7 @@ int main(int argc, char** argv) {
         strcpy(cut, source_filename);;
         tmp = strtok(cut, "/");
         while (tmp != NULL) {
+            strcpy(cut, tmp);
             tmp = strtok(NULL, "/");
         }
         
