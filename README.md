@@ -2,7 +2,7 @@
 
 ## A very small subset of C (Très Petit C)
 
-by notKamui & ZwenDo
+by notKamui & ZwenDo, syntax defined by the Université Gustave Eiffel
 
 ### Summary
 
