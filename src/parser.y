@@ -3,6 +3,7 @@
   #include <string.h>
   #include <unistd.h>
   #include <signal.h>
+  #include <fcntl.h>
   #include "abstract-tree.h"
   #include "symbols-table.h"
   #include "translation.h"
@@ -15,6 +16,9 @@
   struct Node* rootProg;
   SymbolsTable* table;
   FILE *output;
+  char source_fname[64];
+  char fname[64];
+  int is_anon = 0;
 %}
 
 
@@ -150,6 +154,10 @@ ListExp:
 
 void sig_handler(int sig) {
     deleteTree(rootProg);
+    remove(fname);
+    if (is_anon) {
+        remove(source_fname);
+    }
     switch (sig) {
         case SIGUSR1:
             exit(2);
@@ -166,13 +174,14 @@ int main(int argc, char** argv) {
     int showAST = 0;
     int showTable = 0;
     int noOutput = 0;
-    char fname[64];
     char *tmp;
-    char cut[64];
+    char cut[64], buf[1024];
+    int fno, size;
     FILE *file;
 
     signal(SIGUSR1, sig_handler);
     signal(SIGUSR2, sig_handler);
+
 
     while ((option = getopt(argc, argv, ":tsnh")) != -1) {
         switch(option) {
@@ -192,7 +201,8 @@ int main(int argc, char** argv) {
     }
 
     if (optind == argc - 1) {
-        file = fopen(argv[optind], "r");
+        strcpy(source_fname, argv[optind]);
+        file = fopen(source_fname, "r");
         if (file == NULL) {
             fprintf(stderr, "Error: File not found\n");
             exit(3);
@@ -200,7 +210,7 @@ int main(int argc, char** argv) {
         dup2(fileno(file), STDIN_FILENO);
         fclose(file);
 
-        strcpy(cut, argv[optind]);;
+        strcpy(cut, source_fname);;
         tmp = strtok(cut, "/");
         while (tmp != NULL) {
             tmp = strtok(NULL, "/");
@@ -208,15 +218,29 @@ int main(int argc, char** argv) {
         
         strcpy(fname, strtok(cut, "."));
     } else {
+        is_anon = 1;
+        strcpy(source_fname, "_anonymous.tpc");
         strcpy(fname, "_anonymous");
-    }
 
+        fno = open(source_fname, O_CREAT | O_RDWR | O_TRUNC);
+        while ((size = read(STDIN_FILENO, buf, 128)) > 0) {
+            write(fno, buf, size);
+        }
+        close(fno);
+        file = fopen(source_fname, "r");
+        if (file == NULL) {
+            fprintf(stderr, "Error: File not found\n");
+            exit(3);
+        }
+        dup2(fileno(file), STDIN_FILENO);
+        fclose(file);
+    }
     strcat(fname, ".asm");
 
     int ret = yyparse();
     if (ret) exit(1);
-    table = create_table(rootProg, argv[optind]);
-
+    
+    table = create_table(rootProg, source_fname);
     if (showAST) {
         printTree(rootProg);
     }
@@ -224,18 +248,23 @@ int main(int argc, char** argv) {
     if (showTable) {
         print_table(table);
     }
-
-    if (!noOutput) {
-        output = fopen(fname ,"w");
-        if (output == NULL) {
-            fprintf(stderr, "Error: Couldn't write to output file\n");
-            delete_table(table);
-            raise(SIGUSR2);
-        }
-        write_nasm(argv[optind], output, rootProg, table);
-        fclose(output);
+    
+    output = fopen(fname ,"w");
+    if (output == NULL) {
+        fprintf(stderr, "Error: Couldn't write to output file\n");
+        delete_table(table);
+        raise(SIGUSR2);
     }
+    write_nasm(source_fname, output, rootProg, table);
+    fclose(output);
 
+    if (noOutput) {
+        remove(fname);
+    } 
+
+    if (is_anon) {
+        remove(source_fname);
+    }
     delete_table(table);
     deleteTree(rootProg);
 
