@@ -6,3 +6,4 @@ parser.tab.*
 *.o
 testoutputs.txt
 lex.yy.c
+*.asm

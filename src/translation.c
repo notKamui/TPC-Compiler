@@ -36,11 +36,32 @@ static TPCData *get_data(const char *id, SymbolsTable *gtable, SymbolsTable *fta
 
 static int is_prim(Node *name, SymbolsTable *gtable, SymbolsTable *ftable) {
     TPCData *data;
-    if (name->kind == LValue) {
-        data = get_data(FIRSTCHILD(name)->u.identifier, gtable, ftable);
-    } else if (name->kind == FunctionCall) {
-        data = get_data(name->u.identifier, gtable, ftable);
+
+    switch (name->kind) {
+        case LValue:
+            data = get_data(FIRSTCHILD(name)->u.identifier, gtable, ftable);
+            break;
+        case FunctionCall:
+            data = get_data(name->u.identifier, gtable, ftable);
+            break;
+        case IntLiteral:
+        case CharLiteral:
+        case Plus:
+        case Minus:
+        case Prod:
+        case Div:
+        case Mod:
+        case Compar:
+        case And:
+        case Or:
+        case Not:
+        case UnaryMinus:
+        case UnaryPlus:
+            return 1;
+        default:
+            return 0;
     }
+
     if (data == NULL) {
         print_err(source_fname, SEM_ERR, name->lineno, name->charno, "unknown symbol %s\n", name->u.identifier);
         raise(SIGUSR1);
@@ -153,20 +174,21 @@ static void litteral_instr(Node *self) {
 }
 
 static void binop_pop(Node *op, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
-    if (FIRSTCHILD(op)->kind != IntLiteral && FIRSTCHILD(op)->kind != CharLiteral && !is_prim(FIRSTCHILD(op), gtable, ftable)) {
+    if (!is_prim(FIRSTCHILD(op), gtable, ftable)) {
         print_err(source_fname, SEM_ERR, FIRSTCHILD(op)->lineno, FIRSTCHILD(op)->charno, "invalid type, expected int or char\n");
         raise(SIGUSR1);
     }
 
-    if (SECONDCHILD(op)->kind != IntLiteral && SECONDCHILD(op)->kind != CharLiteral && !is_prim(SECONDCHILD(op), gtable, ftable)) {
+    if (!is_prim(SECONDCHILD(op), gtable, ftable)) {
         print_err(source_fname, SEM_ERR, SECONDCHILD(op)->lineno, SECONDCHILD(op)->charno, "invalid type, expected int or char\n");
         raise(SIGUSR1);
     }
 
     instr(FIRSTCHILD(op), last_eff_kind, gtable, ftable);
     instr(SECONDCHILD(op), last_eff_kind, gtable, ftable);
-    POP("rbx");
-    POP("rax");
+    MOV("ebx", "DWORD [rsp]");
+    MOV("eax", "DWORD [rsp + 8]");
+    ADD("rsp", "16");
 }
 
 static void int_binop_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
@@ -198,7 +220,7 @@ static void int_binop_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable
 }
 
 static void int_unop_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
-    if (FIRSTCHILD(self)->kind != IntLiteral && FIRSTCHILD(self)->kind != CharLiteral && !is_prim(FIRSTCHILD(self), gtable, ftable)) {
+    if (!is_prim(FIRSTCHILD(self), gtable, ftable)) {
         print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "invalid type, expected int or char\n");
         raise(SIGUSR1);
     }
@@ -217,7 +239,7 @@ static void bool_binop_instr(Node *op, Kind last_eff_kind, SymbolsTable *gtable,
         case '=':
         case '!':
             binop_pop(op, last_eff_kind, gtable, ftable);
-            CMP("rax", "rbx");
+            CMP("eax", "ebx");
             MOV("rax", "0");
             if (op->u.identifier[0] == '=') {
                 SETZ("al");
@@ -225,28 +247,19 @@ static void bool_binop_instr(Node *op, Kind last_eff_kind, SymbolsTable *gtable,
                 SETNZ("al");
             }
             break;
-        case '<':
         case '>':
-            if (FIRSTCHILD(op)->kind != IntLiteral && FIRSTCHILD(op)->kind != CharLiteral && !is_prim(FIRSTCHILD(op), gtable, ftable)) {
-                print_err(source_fname, SEM_ERR, FIRSTCHILD(op)->lineno, FIRSTCHILD(op)->charno, "invalid type, expected int or char\n");
-                raise(SIGUSR1);
-            }
-
-            if (SECONDCHILD(op)->kind != IntLiteral && SECONDCHILD(op)->kind != CharLiteral && !is_prim(SECONDCHILD(op), gtable, ftable)) {
-                print_err(source_fname, SEM_ERR, SECONDCHILD(op)->lineno, SECONDCHILD(op)->charno, "invalid type, expected int or char\n");
-                raise(SIGUSR1);
-            }
-
-            instr(FIRSTCHILD(op), last_eff_kind, gtable, ftable);
-            instr(SECONDCHILD(op), last_eff_kind, gtable, ftable);
-            if (op->u.identifier[0] == '<') {
-                POP("rbx");
-                POP("rax");
+            binop_pop(op, last_eff_kind, gtable, ftable);
+            CMP("eax", "ebx");
+            MOV("rax", "0");
+            if (strlen(op->u.identifier) == 2) {
+                SETGE("al");
             } else {
-                POP("rax");
-                POP("rbx");
+                SETG("al");
             }
-            CMP("rax", "rbx");
+            break;
+        case '<':
+            binop_pop(op, last_eff_kind, gtable, ftable);
+            CMP("eax", "ebx");
             MOV("rax", "0");
             if (strlen(op->u.identifier) == 2) {
                 SETLE("al");
@@ -281,7 +294,7 @@ static void bool_gate_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable
 }
 
 static void not_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
-    if (FIRSTCHILD(self)->kind != IntLiteral && FIRSTCHILD(self)->kind != CharLiteral && !is_prim(FIRSTCHILD(self), gtable, ftable)) {
+    if (!is_prim(FIRSTCHILD(self), gtable, ftable)) {
         print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "invalid type, expected int or char\n");
         raise(SIGUSR1);
     }
@@ -298,7 +311,7 @@ static void if_else_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable
     char endif_label[INT_MAX_DIGITS + 5], else_label[INT_MAX_DIGITS + 4];
     int local_label;
 
-    if ((FIRSTCHILD(self)->kind == LValue || FIRSTCHILD(self)->kind == FunctionCall) && !is_prim(FIRSTCHILD(self), gtable, ftable)) {
+    if (!is_prim(FIRSTCHILD(self), gtable, ftable)) {
         print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "invalid type, expected int or char\n");
         raise(SIGUSR1);
     }
@@ -313,14 +326,14 @@ static void if_else_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable
     if (THIRDCHILD(self) != NULL && THIRDCHILD(self)->kind == Else) {
         sprintf(else_label, "ELSE%d", local_label);
         JE(else_label);
-        instr(SECONDCHILD(self), If, gtable, ftable);  // instr if
+        suite_instr(SECONDCHILD(self), gtable, ftable);  // instr if
         JMP(endif_label);
         LABEL(else_label);
         instr(FIRSTCHILD(THIRDCHILD(self)), Else, gtable, ftable);  // instr else
         LABEL(endif_label);
     } else {
         JE(endif_label);
-        instr(SECONDCHILD(self), If, gtable, ftable);  // instr if
+        suite_instr(SECONDCHILD(self), gtable, ftable);  // instr if
         LABEL(endif_label);
     }
 }
@@ -329,7 +342,7 @@ static void while_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) 
     char while_label[INT_MAX_DIGITS + 5], endwhile_label[INT_MAX_DIGITS + 8];
     int local_label;
 
-    if ((FIRSTCHILD(self)->kind == LValue || FIRSTCHILD(self)->kind == FunctionCall) && !is_prim(FIRSTCHILD(self), gtable, ftable)) {
+    if (!is_prim(FIRSTCHILD(self), gtable, ftable)) {
         print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "invalid type, expected int or char\n");
         raise(SIGUSR1);
     }
@@ -354,7 +367,7 @@ static void print_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) 
     char id[ID_SIZE];
     TPCData *data;
 
-    if (FIRSTCHILD(self)->kind != IntLiteral && FIRSTCHILD(self)->kind != CharLiteral && !is_prim(FIRSTCHILD(self), gtable, ftable)) {
+    if (!is_prim(FIRSTCHILD(self), gtable, ftable)) {
         print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "invalid type, expected int or char\n");
         raise(SIGUSR1);
     }
@@ -594,7 +607,7 @@ static void prim_assign(TPCData *ldata, const char *lvalue_s, Node *rvalue, Symb
         default:
             instr(rvalue, Assign, gtable, ftable);
             POP("rax");
-            sprintf(rvalue_content, "eax");
+            sprintf(rvalue_content, ldata->type.u.ptype == TPCInt ? "eax" : "al");
             break;
     }
     MOV(lvalue_s, rvalue_content);

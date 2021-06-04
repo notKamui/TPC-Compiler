@@ -34,7 +34,7 @@ if			{ charno += yyleng;return IF; }
 else			{ charno += yyleng;return ELSE; }
 while			{ charno += yyleng;return WHILE; }
 return			{ charno += yyleng;return RETURN; }
-[a-zA-Z_][a-zA-Z0-9_]*	{ charno += yyleng - 1; strcpy(yylval.Identifier, yytext); return IDENT; }
+[a-zA-Z_][a-zA-Z0-9_]*	{ charno += yyleng; strcpy(yylval.Identifier, yytext); return IDENT; }
 [0-9]+			{ charno += yyleng; yylval.IntLiteral = atoi(yytext); return NUM;}
 '\\?.'			{ 
   charno += yyleng;

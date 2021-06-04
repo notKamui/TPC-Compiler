@@ -174,6 +174,7 @@ int main(int argc, char** argv) {
     int showAST = 0;
     int showTable = 0;
     int noOutput = 0;
+    int withExecutable = 0;
     char *tmp;
     char cut[64], buf[1024];
     int fno, size;
@@ -183,7 +184,7 @@ int main(int argc, char** argv) {
     signal(SIGUSR2, sig_handler);
 
 
-    while ((option = getopt(argc, argv, ":tsnh")) != -1) {
+    while ((option = getopt(argc, argv, ":tsnxh")) != -1) {
         switch(option) {
             case 't':
                 showAST = 1;
@@ -194,8 +195,11 @@ int main(int argc, char** argv) {
             case 'n':
                 noOutput = 1;
                 break;
+            case 'x':
+                withExecutable = 1;
+                break;
             case 'h':
-                printf("Usage: tpcc [OPTIONS] [file]\n\nOPTIONS:\n-t: Prints the AST of the selected program\n-s: Prints the symbol table of the selected program\n-n: No output (prevents creating an asm file)\n-h: Prints this message\ntpcc can also receive its input feed from stdin");
+                printf("Usage: tpcc [OPTIONS] [file]\n\nOPTIONS:\n-t: Prints the AST of the selected program\n-s: Prints the symbol table of the selected program\n-n: No output (prevents creating an asm file)\n-x: produces an executable file\n-h: Prints this message\ntpcc can also receive its input feed from stdin");
                 return 0;
         }
     }
@@ -257,6 +261,15 @@ int main(int argc, char** argv) {
     }
     write_nasm(source_fname, output, rootProg, table);
     fclose(output);
+
+    if (withExecutable) {
+        sprintf(buf, "nasm -f elf64 %s", fname);
+        system(buf);
+        sprintf(buf, "gcc -no-pie %s.o -o %s", is_anon ? "_anonymous" : cut, is_anon ? "_anonymous" : cut);
+        system(buf);
+        sprintf(buf, "rm %s.o", is_anon ? "_anonymous" : cut);
+        system(buf);
+    }
 
     if (noOutput) {
         remove(fname);
