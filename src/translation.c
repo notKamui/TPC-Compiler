@@ -326,14 +326,26 @@ static void if_else_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable
     if (THIRDCHILD(self) != NULL && THIRDCHILD(self)->kind == Else) {
         sprintf(else_label, "ELSE%d", local_label);
         JE(else_label);
-        suite_instr(SECONDCHILD(self), gtable, ftable);  // instr if
+        if (SECONDCHILD(self)->kind == SuiteInstr) {
+            suite_instr(SECONDCHILD(self), gtable, ftable); /* instr if */
+        } else {
+            instr(SECONDCHILD(self), SuiteInstr, gtable, ftable);
+        }
         JMP(endif_label);
         LABEL(else_label);
-        instr(FIRSTCHILD(THIRDCHILD(self)), Else, gtable, ftable);  // instr else
+        if (FIRSTCHILD(THIRDCHILD(self))->kind == SuiteInstr) { /* instr else */
+            suite_instr(FIRSTCHILD(THIRDCHILD(self)), gtable, ftable);
+        } else {
+            instr(FIRSTCHILD(THIRDCHILD(self)), SuiteInstr, gtable, ftable);
+        }
         LABEL(endif_label);
     } else {
         JE(endif_label);
-        suite_instr(SECONDCHILD(self), gtable, ftable);  // instr if
+        if (SECONDCHILD(self)->kind == SuiteInstr) {
+            suite_instr(SECONDCHILD(self), gtable, ftable); /* instr if */
+        } else {
+            instr(SECONDCHILD(self), SuiteInstr, gtable, ftable);
+        }
         LABEL(endif_label);
     }
 }
@@ -358,7 +370,11 @@ static void while_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) 
     POP("rax");
     CMP("rax", "0");
     JE(endwhile_label);
-    suite_instr(SECONDCHILD(self), gtable, ftable);
+    if (SECONDCHILD(self)->kind == SuiteInstr) {
+        suite_instr(SECONDCHILD(self), gtable, ftable); /* instr while */
+    } else {
+        instr(SECONDCHILD(self), SuiteInstr, gtable, ftable);
+    }
     JMP(while_label);
     LABEL(endwhile_label);
 }
@@ -447,7 +463,6 @@ static void read_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
     }
 }
 
-/* TODO err sem à faire */
 static void loc_prim_name(char *fetched, TPCData *data) {
     int fetched_size, data_offset;
 
@@ -459,7 +474,6 @@ static void loc_prim_name(char *fetched, TPCData *data) {
     sprintf(fetched, "%s [rbp - (%d)]", size_to_asmsize(fetched_size), data_offset);
 }
 
-/* TODO err sem à faire */
 static void glob_prim_name(char *fetched, TPCData *data, const char *id) {
     int fetched_size;
     char buff[2 * ID_SIZE + 1];
@@ -506,6 +520,12 @@ static void compare_types(TPCData *ldata, Node *rvalue, SymbolsTable *gtable, Sy
         print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "unknown symbol %s\n", id);
         raise(SIGUSR1);
     }
+
+    if (rdata->type.kind == KindFunction && rdata->type.u.ftype.no_ret) {
+        print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "trying to assign void\n");
+        raise(SIGUSR1);
+    }
+
     if (ldata->type.kind == KindPrim) { /* left value type == int or char */
         switch (rdata->type.kind) {
             case KindFunction:
@@ -794,35 +814,40 @@ static void place_on_top(Node *self, SymbolsTable *gtable, SymbolsTable *ftable)
     }
 }
 
-static int stack_param(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+static int stack_param(Node *self, TPCTypeFunc *args, SymbolsTable *gtable, SymbolsTable *ftable) {
     int offset;
-    char buff[INT_MAX_DIGITS + 16];
+    char buff[TABLE_NAME_SIZE];
 
     assert(self);
 
     if (self->nextSibling) {
-        offset = stack_param(self->nextSibling, gtable, ftable);
+        offset = stack_param(self->nextSibling, &(*(args + 1)), gtable, ftable);
     } else {
         offset = 0;
     }
 
     instr(self, FunctionCall, gtable, ftable);
-    switch (self->kind) {
-        case CharLiteral:
-            MOV("al", "BYTE [rsp]");
-            sprintf(buff, "BYTE [rsp + %d]", offset + 7);
-            MOV(buff, "al");
-            return offset + 7;
-        case LValue:
-            if (get_data(FIRSTCHILD(self)->u.identifier, gtable, ftable)->type.kind == KindStruct) {
-                return offset;
-            }
-        default:
+
+    if (args->kind == KindPrim) {
+        if (args->u.ptype == TPCInt) {
             MOV("eax", "DWORD [rsp]");
             sprintf(buff, "DWORD [rsp + %d]", offset + 4);
             MOV(buff, "eax");
             return offset + 4;
+        } else { /* TPCChar */
+            MOV("al", "BYTE [rsp]");
+            sprintf(buff, "BYTE [rsp + %d]", offset + 7);
+            MOV(buff, "al");
+            return offset + 7;
+        }
+    } else { /* KindStruct */
+        /*sprintf(buff, "struct %s", args->u.struct_name);
+        if (get_table_by_name(gtable, buff, self->lineno, self->charno) != NULL) {
+            return offset;
+        }*/
+        return offset;
     }
+
     return 0;
 }
 
@@ -934,7 +959,7 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
     MOV("r15", "rsp"); /* saves the old rsp position before params stacking in r9 */
 
     if (FIRSTCHILD(self)) {
-        offset = stack_param(FIRSTCHILD(FIRSTCHILD(self)), gtable, ftable); /* add args of the function on the stack */
+        offset = stack_param(FIRSTCHILD(FIRSTCHILD(self)), data->type.u.ftype.args_types, gtable, ftable); /* add args of the function on the stack */
 
         sprintf(buff2, "%d", offset);
         ADD("rsp", buff2); /* realigning the stack */
@@ -950,7 +975,7 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
 }
 
 static void return_check(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
-    if (current_func->type.u.ftype.no_ret && FIRSTCHILD(self) != NULL) {
+    if (current_func->type.u.ftype.no_ret && FIRSTCHILD(self)->kind != Void) {
         print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "unexpected return value in void function\n");
         raise(SIGUSR1);
     }

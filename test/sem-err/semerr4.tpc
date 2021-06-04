@@ -1,0 +1,21 @@
+struct foo {
+    int i;
+    int j;
+    char c;
+};
+
+struct foo non;
+int a;
+char non;
+
+void tpc_miam(struct foo f) {
+    print(f.c);
+    print('\n');
+}
+
+int main(void) {
+    int a;
+    a = 5;
+
+    return 0;
+}

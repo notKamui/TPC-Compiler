@@ -1,0 +1,20 @@
+struct foo {
+    int i;
+    int j;
+    char c;
+};
+
+int fat(char c) {
+    print(c);
+    print('\n');
+}
+
+int main(void) {
+    int a;
+    struct foo aled;
+    a = 5;
+    fat(aled.c);
+    fat(aled);
+
+    return 0;
+}

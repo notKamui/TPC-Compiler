@@ -68,7 +68,9 @@ void print_table(SymbolsTable *table) {
         printf(":\n");
     }
     while (hashtable_iterator_next(&it)) {
-        printf("\tid: %s   type: %s\t\t\toffset: %d\n", it.key, tpc_to_str(it.value->type), it.value->offset);
+        if (strstr(it.key, ".") == NULL) {
+            printf("\tid: %s   type: %s\n", it.key, tpc_to_str(it.value->type));
+        }
     }
 
     printf("\n");

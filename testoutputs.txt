@@ -1,0 +1,232 @@
+##########Beginning tests##########
+======Valid programs======
+File: test/good/mini_game.tpc
+--> Valid syntax
+
+File: test/good/testStruct.tpc
+--> Valid syntax
+
+File: test/good/test.tpc
+--> Valid syntax
+
+File: test/good/trinome.tpc
+--> Valid syntax
+
+
+======Syntax error programs======
+File: test/syn-err/trinomebad10.tpc
+syntax error near line 17 at char 9
+int main() {
+         ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad11.tpc
+syntax error near line 20 at char 5
+   b=!=-1;
+     ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad12.tpc
+syntax error near line 21 at char 7
+   whi le (b<=1) {
+       ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad13.tpc
+syntax error near line 21 at char 11
+   while (b=>1) {
+           ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad14.tpc
+syntax error near line 21 at char 11
+   while (b=1) {
+           ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad15.tpc
+syntax error near line 22 at char 9
+       c=*1;
+         ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad16.tpc
+syntax error near line 35 at char 3
+   return 0;
+   ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad17.tpc
+syntax error near line 25 at char 15
+           if () {
+               ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad18.tpc
+syntax error near line 26 at char 25
+               print(r1) print (r2);
+                         ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad19.tpc
+syntax error near line 28 at char 25
+               if (0<=r1 & r1<=max && 0>=r2 && r2>=-max)
+                         ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad1.tpc
+syntax error near line 7 at char 7
+int r1 r2;
+       ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad20.tpc
+syntax error near line 28 at char 25
+               if (0<=r1 & & r1<=max && 0>=r2 && r2>=-max)
+                         ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad21.tpc
+syntax error near line 38 at char 0
+int trinome(int a,int b, int c) {
+^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad22.tpc
+syntax error near line 38 at char 1
+ trinome(int a,int b, int c) {
+ ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad23.tpc
+syntax error near line 41 at char 8
+    d=b**b-4*a*c;
+        ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad24.tpc
+syntax error near line 53 at char 0
+        r1=(-b+s)/*(2*a);
+^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad25.tpc
+syntax error near line 45 at char 17
+        r2=(-b-s)(2*a);
+                 ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad26.tpc
+syntax error near line 52 at char 21
+    return a*x*x+b*x+"c";
+                     ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad2.tpc
+syntax error near line 7 at char 4
+int , r2;
+    ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad3.tpc
+syntax error near line 8 at char 0
+int max;
+^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad4.tpc
+syntax error near line 10 at char 0
+strut point{
+^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad5.tpc
+syntax error near line 10 at char 6
+struct{
+      ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad6.tpc
+syntax error near line 12 at char 1
+	int x;
+ ^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad7.tpc
+syntax error near line 13 at char 0
+};
+^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad8.tpc
+syntax error near line 17 at char 0
+int main(void) {
+^
+--> Invalid syntax
+
+File: test/syn-err/trinomebad9.tpc
+syntax error near line 17 at char 4
+int (void) {
+    ^
+--> Invalid syntax
+
+======Semantic error programs======
+File: test/sem-err/semerr1.tpc
+Semantic error, near line 12 char 15: invalid type, expected int, got struct foo
+    return aled;
+               ^
+--> Semantic error
+
+File: test/sem-err/semerr2.tpc
+Semantic error, near line 17 char 12: function 'fat' argument 1, expected char, got struct foo
+    fat(aled);
+            ^
+--> Semantic error
+
+File: test/sem-err/semerr3.tpc
+Semantic error, near line 10 char 13: unexpected return value in void function
+    return f.i;
+             ^
+--> Semantic error
+
+File: test/sem-err/semerr4.tpc
+Semantic error, near line 9 char 8: symbol 'non' already defined
+char non;
+        ^
+--> Semantic error
+
+File: test/sem-err/semerr5.tpc
+--> Valid syntax
+
+File: test/sem-err/semerr6.tpc
+Semantic error, near line 18 char 9: unknown symbol z
+    a = z;
+         ^
+--> Semantic error
+
+File: test/sem-err/semerr7.tpc
+Semantic error, near line 19 char 14: invalid type, expected int variable
+    reade(non);
+              ^
+--> Semantic error
+
+File: test/sem-err/semerr8.tpc
+Semantic error, near line 18 char 20: trying to assign void
+    a = tpc_miam(non);
+                    ^
+--> Semantic error
+
+
+======Warning programs======
+File: test/warn/warn1.tpc
+--> Valid syntax
+
+File: test/warn/warn2.tpc
+--> Valid syntax
+
+File: test/warn/warn3.tpc
+--> Valid syntax
+
+##########Ending tests##########
+
+40 out of 41 test(s) passed!

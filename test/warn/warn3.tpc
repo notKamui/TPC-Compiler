@@ -1,0 +1,11 @@
+int foo(char c) {
+    print(c);
+    print('\n');
+    return 0;
+}
+
+int main(void) {
+    char c;
+    c = foo('z');
+    return 0;
+}

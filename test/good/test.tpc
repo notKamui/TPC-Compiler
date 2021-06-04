@@ -5,8 +5,9 @@ struct foo {
 
 char l, m, n;
 struct foo w, x;
+int somme;
 
-struct foo test(struct foo a, char b) {
+void test(struct foo a, char b) {
     int indice, p_indice;
     somme = 12;
     if (1) {
@@ -17,15 +18,13 @@ struct foo test(struct foo a, char b) {
         }
     }
     (3 + 5) * (2 - 3 / 2);
-    return;
 }
 
-void main(void)  {
-    int somme, produit, quotient, reste, difference ;
+int main(void) {
+    int somme, produit, quotient, reste, difference;
     char letter, digit, punct;
     int p_compteur;
     int indice, p_indice;
-    
 
     test(w, letter);
     somme = 12;

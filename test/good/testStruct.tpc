@@ -8,15 +8,19 @@ struct bar {
     int y;
 };
 
-struct test foo(struct bar c, int arg1, int arg2, char arg3) {
-    return arg3;
+struct bar t;
+
+struct bar foo(struct bar c, int arg1, char arg2) {
+    return c;
 }
 
 int main(void) {
-    a = 1; un = 'a';
-    t = machin(t, a, un);
+    a = 1;
+    un = 'a';
+    t = foo(t, a, un);
 
-    print(a); print(un);
+    print(a);
+    print(un);
 
     return 0;
 }

@@ -1,0 +1,9 @@
+void foo(char c) {
+    print(c);
+    print('\n');
+}
+
+int main(void) {
+    foo(99);
+    return 0;
+}

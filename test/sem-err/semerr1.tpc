@@ -1,0 +1,13 @@
+struct foo {
+    int i;
+    int j;
+    char c;
+};
+
+int main(void) {
+    int a;
+    struct foo aled;
+    a = 5;
+
+    return aled;
+}

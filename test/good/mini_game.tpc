@@ -130,9 +130,11 @@ struct pair game(struct pair numbers) {
         reade(numbers.guessed);
         if (numbers.guessed > numbers.to_find) {
             hint_less();
-        }
-        if (numbers.guessed < numbers.to_find) {
+        } else if (numbers.guessed < numbers.to_find) {
             hint_more();
+        }
+        if (numbers.guessed == 666666) {
+            return numbers;
         }
     }
     return numbers;
@@ -175,9 +177,9 @@ void end_message(void) {
     print('m');
     print('p');
     print('t');
-    print('(');
-    print('s');
-    print(')');
+    if (n > 1) {
+        print('s');
+    }
     print(' ');
     print('!');
     print('!');

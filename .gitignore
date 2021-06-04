@@ -4,6 +4,4 @@ obj
 a.out
 parser.tab.*
 *.o
-testoutputs.txt
 lex.yy.c
-*.asm
