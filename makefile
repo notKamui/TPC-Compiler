@@ -5,7 +5,11 @@ EXEC=tpcc
 PARSER=parser
 LEXER=lexer
 
-all : $(EXEC)
+all : makedirs $(EXEC)
+
+makedirs:
+	@mkdir bin
+	@mkdir obj
 
 $(EXEC): $(PARSER).tab.c $(OBJ) 
 	$(CC) src/$(PARSER).tab.c $(OBJ:%.o=obj/%.o) -o bin/$(EXEC)
