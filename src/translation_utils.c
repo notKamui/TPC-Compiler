@@ -44,6 +44,7 @@ char *size_to_asmsize(size_t size) {
     }
 }
 
+/* checks recursively if the if else group has a complete return */
 static int check_ifelse(Node *n) {
     Node *tmp;
     int rollback;
