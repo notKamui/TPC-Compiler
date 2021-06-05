@@ -40,7 +40,7 @@ void print_err(const char *path, int errtype, int lineno, int charno, char *form
         strcpy(header, "Warning,");
     }
 
-    fprintf(stderr, "%s near line %d char %d: ", header, lineno, charno);
+    fprintf(stderr, "%s near line %d char %d: ", header, lineno, charno + 1);
     va_start(argp, format);
     vfprintf(stderr, format, argp);
     va_end(argp);

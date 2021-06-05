@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
+#include "abstract-tree.h"
+
 #define COMMENT(s) fprintf(file, "\t; %s\n", s)
 #define LABEL(l) fprintf(file, "%s:\n", l)
 #define PUSH(r) fprintf(file, "\tpush %s\n", r)
@@ -36,5 +38,7 @@ size_t prim_to_size(char *type);
 char size_to_declsize(size_t size);
 
 char *size_to_asmsize(size_t size);
+
+void check_control_flow(const char *source, Node *func);
 
 #endif

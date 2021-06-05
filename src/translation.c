@@ -1156,6 +1156,9 @@ static void decl_foncts(Node *foncts, SymbolsTable *gtable) {
         if (n->nextSibling) {
             fprintf(file, "\n");
         }
+        if (FIRSTCHILD(FIRSTCHILD(n))->kind != Void) {
+            check_control_flow(source_fname, n);
+        }
     }
 }
 
