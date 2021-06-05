@@ -10,6 +10,7 @@ by notKamui & ZwenDo, syntax defined by the Université Gustave Eiffel
 - [Requirements](#Requirements)
 - [Compiling the Compiler](#Compiling-the-Compiler)
 - [Usage](#Usage)
+- [Sample](#Sample)
 
 ### The Language
 
@@ -44,4 +45,15 @@ OPTIONS:
 -x: produces an executable file
 -h: Prints this message
 tpcc can also receive its input feed from stdin
+```
+
+### Sample
+
+A good sample is given in `./sample/mini_game.tpc`. It's a valid tpc program than you can compile and execute (it's a Guess The Number game).
+
+Compile and execute it with the following commands:
+
+```sh
+tpcc -nx sample/mini_game.tpc
+./mini_game
 ```

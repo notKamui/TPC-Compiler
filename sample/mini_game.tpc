@@ -1,0 +1,224 @@
+struct pair {
+    int to_find;
+    int guessed;
+    int attempts;
+};
+
+int n;
+
+void start_message(void) {
+    print('t');
+    print('y');
+    print('p');
+    print('e');
+    print(' ');
+    print('a');
+    print(' ');
+    print('p');
+    print('o');
+    print('s');
+    print('i');
+    print('t');
+    print('i');
+    print('v');
+    print('e');
+    print(' ');
+    print('s');
+    print('e');
+    print('e');
+    print('d');
+    print(' ');
+    print('t');
+    print('o');
+    print(' ');
+    print('g');
+    print('e');
+    print('n');
+    print('e');
+    print('r');
+    print('a');
+    print('t');
+    print('e');
+    print(' ');
+    print('a');
+    print(' ');
+    print('\'');
+    print('r');
+    print('a');
+    print('n');
+    print('d');
+    print('o');
+    print('m');
+    print('\'');
+    print(' ');
+    print('n');
+    print('u');
+    print('m');
+    print('b');
+    print('e');
+    print('r');
+    print(' ');
+    print('\n');
+}
+
+void print_attempts(int attempts) {
+    print('a');
+    print('t');
+    print('t');
+    print('e');
+    print('m');
+    print('p');
+    print('t');
+    print(' ');
+    print(attempts);
+    print(' ');
+    print(':');
+    print('\n');
+}
+
+void print_seed_error(void) {
+    print('e');
+    print('r');
+    print('r');
+    print('o');
+    print('r');
+    print(' ');
+    print('s');
+    print('e');
+    print('e');
+    print('d');
+    print(' ');
+    print('m');
+    print('u');
+    print('s');
+    print('t');
+    print(' ');
+    print('b');
+    print('e');
+    print(' ');
+    print('p');
+    print('o');
+    print('s');
+    print('i');
+    print('t');
+    print('i');
+    print('v');
+    print('e');
+    print('\n');
+}
+
+void hint_more(void) {
+    print('m');
+    print('o');
+    print('r');
+    print('e');
+    print('\n');
+}
+
+void hint_less(void) {
+    print('l');
+    print('e');
+    print('s');
+    print('s');
+    print('\n');
+}
+
+struct pair game(struct pair numbers) {
+    while (numbers.guessed != numbers.to_find) {
+        numbers.attempts = numbers.attempts + 1;
+        print_attempts(numbers.attempts);
+        reade(numbers.guessed);
+        if (numbers.guessed > numbers.to_find) {
+            hint_less();
+        } else if (numbers.guessed < numbers.to_find) {
+            hint_more();
+        }
+        if (numbers.guessed == 666666) {
+            return numbers;
+        }
+    }
+    return numbers;
+}
+
+void end_message(void) {
+    print('w');
+    print('p');
+    print(' ');
+    print('y');
+    print('o');
+    print('u');
+    print(' ');
+    print('f');
+    print('o');
+    print('u');
+    print('n');
+    print('d');
+    print(' ');
+    print('t');
+    print('h');
+    print('e');
+    print(' ');
+    print('n');
+    print('u');
+    print('m');
+    print('b');
+    print('e');
+    print('r');
+    print(' ');
+    print('i');
+    print('n');
+    print(' ');
+    print(n);
+    print(' ');
+    print('a');
+    print('t');
+    print('t');
+    print('e');
+    print('m');
+    print('p');
+    print('t');
+    if (n > 1) {
+        print('s');
+    }
+    print(' ');
+    print('!');
+    print('!');
+    print('!');
+    print('\n');
+}
+
+void call_start_message(void) {
+    start_message();
+}
+
+int random_number(int seed) {
+    return ((seed + 53) * 79 / (1 + seed % 47));
+}
+
+void type_positive_number(void) {
+    int local;
+    local = -1;
+    while (local < 0) {
+        reade(local);
+        if (local < 0) {
+            print_seed_error();
+        }
+    }
+    n = local % 5000;
+}
+
+int main(void) {
+    struct pair numbers;
+
+    call_start_message();
+
+    type_positive_number();
+    numbers.to_find = random_number(n);
+    numbers.guessed = numbers.to_find - 1;
+    numbers.attempts = 0;
+    numbers = game(numbers);
+    n = numbers.attempts;
+    end_message();
+
+    return 0;
+}
