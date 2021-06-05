@@ -7,6 +7,7 @@ struct foo {
 int fat(char c) {
     print(c);
     print('\n');
+    return 0;
 }
 
 int main(void) {

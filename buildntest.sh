@@ -11,6 +11,7 @@ launch(){
     echo "File: $1" | tee -a testoutputs.txt
     let total++
     error=`./bin/tpcc -n $1 2>&1`
+    printf "$error\n" | tee -a testoutputs.txt
     let errno=$?
     if [ $errno = 0 ]; then
         echo "--> Valid syntax" | tee -a testoutputs.txt
@@ -18,19 +19,16 @@ launch(){
             let passed++
         fi
     elif [ $errno = 1 ]; then
-        printf "$error\n" | tee -a testoutputs.txt
         echo "--> Invalid syntax" | tee -a testoutputs.txt
         if [ $2 = 1 ]; then
             let passed++
         fi
     elif [ $errno = 2 ]; then
-        printf "$error\n" | tee -a testoutputs.txt
         echo "--> Semantic error" | tee -a testoutputs.txt
         if [ $2 = 2 ]; then
             let passed++
         fi
     elif [ $errno = 3 ]; then
-        printf "$error\n" | tee -a testoutputs.txt
         echo "--> Other error" | tee -a testoutputs.txt
         if [ $3 = 3 ]; then
             let passed++
