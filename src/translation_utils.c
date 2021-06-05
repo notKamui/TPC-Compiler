@@ -62,7 +62,7 @@ static int check_ifelse(Node *n) {
     return rollback;
 }
 
-/* starts at SuiteInstr node of Corps */
+/* starts at SuiteInstr node of Corps ; returns 1 if is return completed, 0 if not */
 static int rec_check(Node *self) {
     Node *n;
     int rollback_if, rollback_else;
