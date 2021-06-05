@@ -97,7 +97,15 @@ static int rec_check(Node *self) {
                 }
                 flow_count -= off;
                 return 1;
-            case SuiteInstr: /* TODO this shit */
+            case SuiteInstr:
+                if (rec_check(n)) {
+                    if (scope_level == 0) { /* main scope return is always valid */
+                        flow_count = 0;
+                        return 1;
+                    }
+                    flow_count -= off;
+                    return 1;
+                }
                 break;
             default:
                 if (scope_level == 0 && !has_control_flow && n->nextSibling == NULL) {
