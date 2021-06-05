@@ -198,6 +198,8 @@ int main(int argc, char** argv) {
             case 'x':
                 withExecutable = 1;
                 break;
+            case '?':
+                printf("Unknown option\n");
             case 'h':
                 printf("Usage: tpcc [OPTIONS] [file]\n\nOPTIONS:\n-t: Prints the AST of the selected program\n-s: Prints the symbol table of the selected program\n-n: No output (prevents creating an asm file)\n-x: produces an executable file\n-h: Prints this message\ntpcc can also receive its input feed from stdin\n");
                 return 0;

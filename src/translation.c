@@ -975,6 +975,9 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
 }
 
 static void return_check(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
+    if (current_func->type.u.ftype.no_ret && FIRSTCHILD(self)->kind == Void) {
+        return;
+    }
     if (current_func->type.u.ftype.no_ret && FIRSTCHILD(self)->kind != Void) {
         print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "unexpected return value in void function\n");
         raise(SIGUSR1);

@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "sem-err.h"
@@ -9,6 +10,7 @@
 int scope_level;
 int flow_count;
 int has_control_flow;
+Node *suite_instr;
 
 static int rec_check(Node *self);
 
@@ -46,15 +48,13 @@ char *size_to_asmsize(size_t size) {
 
 /* checks recursively if the if else group has a complete return ; returns 1 if is return completed, 0 if not */
 static int check_ifelse(Node *n) {
-    Node *tmp;
     if (n->kind == SuiteInstr) {
         return rec_check(n);
     } else if (n->kind == Return) {
         return 1;
     } else if (n->kind == If) { /* no braces syntax */
-        tmp = makeNode(SuiteInstr);
-        addChild(tmp, n);
-        return rec_check(tmp);
+        suite_instr->firstChild = n;
+        return rec_check(suite_instr);
     } else {
         return 0;
     }
@@ -126,8 +126,9 @@ void check_control_flow(const char *source, Node *func) {
     flow_count = 0;
     has_control_flow = 0;
 
+    suite_instr = makeNode(SuiteInstr);
     rec_check(SECONDCHILD(SECONDCHILD(func)));
-
+    free(suite_instr);
     if (flow_count != 0) {
         print_err(source, SEM_ERR, func->lineno, func->charno, "control may reach end of non-void function '%s'\n", SECONDCHILD(FIRSTCHILD(func))->u.identifier);
         raise(SIGUSR1);
