@@ -44,22 +44,20 @@ char *size_to_asmsize(size_t size) {
     }
 }
 
-/* checks recursively if the if else group has a complete return */
+/* checks recursively if the if else group has a complete return ; returns 1 if is return completed, 0 if not */
 static int check_ifelse(Node *n) {
     Node *tmp;
-    int rollback;
     if (n->kind == SuiteInstr) {
-        rollback = rec_check(n);
+        return rec_check(n);
     } else if (n->kind == Return) {
-        rollback = 1;
+        return 1;
     } else if (n->kind == If) { /* no braces syntax */
         tmp = makeNode(SuiteInstr);
         addChild(tmp, n);
-        rollback = rec_check(tmp);
+        return rec_check(tmp);
     } else {
-        rollback = 0;
+        return 0;
     }
-    return rollback;
 }
 
 /* starts at SuiteInstr node of Corps ; returns 1 if is return completed, 0 if not */
