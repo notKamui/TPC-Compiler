@@ -1,29 +1,30 @@
 CC=gcc
-OBJ=abstract-tree.o symbols-table.o symbol.o hashtable.o translation.o translation_utils.o sem-err.o lex.yy.o
+DEPS=abstract-tree symbols-table symbol hashtable translation translation_utils sem-err lex.yy
+OBJ=$(DEPS:%=obj/%.o)
 CFLAGS=-Wall -ly -lfl -pedantic -g
 EXEC=tpcc
 PARSER=parser
 LEXER=lexer
 
-all : makedirs $(EXEC)
+all : makedirs bin/$(EXEC)
 
 makedirs:
 	@mkdir -p bin
 	@mkdir -p obj
 
-$(EXEC): $(PARSER).tab.c $(OBJ) 
-	$(CC) src/$(PARSER).tab.c $(OBJ:%.o=obj/%.o) -o bin/$(EXEC)
+bin/$(EXEC): src/$(PARSER).tab.c $(OBJ) 
+	$(CC) src/$(PARSER).tab.c $(OBJ) -o bin/$(EXEC)
 
-lex.yy.o: lex.yy.c
+obj/lex.yy.o: src/lex.yy.c
 	$(CC) -c src/lex.yy.c -o obj/lex.yy.o $(CFLAGS)
 
-lex.yy.c: src/$(LEXER).l
-	flex -o src/$@ src/$(LEXER).l
+src/lex.yy.c: src/$(LEXER).l
+	flex -o $@ src/$(LEXER).l
 
-%.o: src/%.c src/%.h
-	$(CC) -c $< -o obj/$@ $(CFLAGS)
+obj/%.o: src/%.c src/%.h
+	$(CC) -c $< -o $@ $(CFLAGS)
 
-$(PARSER).tab.c: src/$(PARSER).y
+src/$(PARSER).tab.c: src/$(PARSER).y
 	bison -d src/$(PARSER).y
 	@mv $(PARSER).tab.c src/
 	@mv $(PARSER).tab.h src/

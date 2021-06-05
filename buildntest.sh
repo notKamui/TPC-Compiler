@@ -11,8 +11,8 @@ launch(){
     echo "File: $1" | tee -a testoutputs.txt
     let total++
     error=`./bin/tpcc -n $1 2>&1`
-    printf "$error\n" | tee -a testoutputs.txt
     let errno=$?
+    printf "$error\n" | tee -a testoutputs.txt
     if [ $errno = 0 ]; then
         echo "--> Valid syntax" | tee -a testoutputs.txt
         if [ $2 = 0 ]; then
