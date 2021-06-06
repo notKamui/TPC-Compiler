@@ -413,7 +413,7 @@ static void print_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) 
 }
 
 static void read_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
-    char buff[ID_SIZE + 13];
+    char buff[ID_SIZE + 3];
     TPCData *data;
 
     strcpy(buff, FIRSTCHILD(FIRSTCHILD(self))->u.identifier); /* copy the id ov the */
@@ -440,7 +440,10 @@ static void read_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
         CALL("scanf");
     } else { /* global */
         data = hashtable_get(gtable->self, buff);
-        if (data->type.kind == KindStruct || data->type.kind == KindFunction || data->type.kind == KindDeclStruct) {
+        if (data == NULL) {
+            print_err(source_fname, SEM_ERR, FIRSTCHILD(self)->lineno, FIRSTCHILD(self)->charno, "unknown symbol %s\n", FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
+            raise(SIGUSR1);
+        } else if (data->type.kind == KindStruct || data->type.kind == KindFunction || data->type.kind == KindDeclStruct) {
             print_err(source_fname, SEM_ERR, self->lineno, self->charno, "invalid type, expected %s variable\n", self->kind == Reade ? "int" : "char");
             raise(SIGUSR1);
         } else if (self->kind == Readc && data->type.u.ptype == TPCInt) {
@@ -456,7 +459,11 @@ static void read_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
         PUSH("r9");
 
         MOV("rdi", self->kind == Reade ? "fmtd" : "fmtc");
-        sprintf(buff, "[%s]", FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
+        if (strstr(FIRSTCHILD(FIRSTCHILD(self))->u.identifier, ".") == NULL) {
+            sprintf(buff, "[%s]", FIRSTCHILD(FIRSTCHILD(self))->u.identifier);
+        } else {
+            sprintf(buff, "[%s + %d]", strtok(FIRSTCHILD(FIRSTCHILD(self))->u.identifier, "."), data->offset);
+        }
         LEA("rsi", buff);
         MOV("rax", "0");
         CALL("scanf");
@@ -732,6 +739,12 @@ static void struct_assign(TPCData *ldata, Node *rvalue, SymbolsTable *gtable, Sy
     ADD("rax", "1");
     JMP(struct_assign);
     LABEL(end_struct_assign);
+
+    if (from_stack) { /* empty the stack */
+        sprintf(buff, "%d", struct_table->max_offset);
+        COMMENT("empty the stack");
+        ADD("rsp", buff);
+    }
 }
 
 static void assign_instr(Node *self, SymbolsTable *gtable, SymbolsTable *ftable) {
@@ -935,9 +948,9 @@ static void functioncall_check(Node *self, TPCData *fdata, SymbolsTable *gtable,
 }
 
 static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gtable, SymbolsTable *ftable) {
-    char buff[128], buff2[128];
+    char return_size[INT_MAX_DIGITS], args_offset[INT_MAX_DIGITS], struct_table_name[TABLE_NAME_SIZE];
     TPCData *data;
-    SymbolsTable *t;
+    SymbolsTable *struct_table;
     int offset;
 
     data = hashtable_get(gtable->self, self->u.identifier);
@@ -947,22 +960,21 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
 
     if (!data->type.u.ftype.no_ret) {
         if (data->type.u.ftype.return_type.kind == KindPrim) {
-            strcpy(buff, "8");
+            strcpy(return_size, "8"); /* copy the return size for primlitives in the buffer */
         } else {
-            sprintf(buff, "struct %s", data->type.u.ftype.return_type.u.struct_name);
-            t = get_table_by_name(gtable, buff, self->lineno, self->charno);
-            assert(t);
-            sprintf(buff, "%d", t->max_offset);
+            sprintf(struct_table_name, "struct %s", data->type.u.ftype.return_type.u.struct_name);
+            struct_table = get_table_by_name(gtable, struct_table_name, self->lineno, self->charno);
+            assert(struct_table);
+            sprintf(return_size, "%d", struct_table->max_offset); /* copy the struct size in the buffer */
         }
-        SUB("rsp", buff); /* allocates the memory for the function return in the stack */
+        SUB("rsp", return_size); /* allocates the memory for the function return in the stack */
     }
     MOV("r15", "rsp"); /* saves the old rsp position before params stacking in r9 */
 
     if (FIRSTCHILD(self)) {
         offset = stack_param(FIRSTCHILD(FIRSTCHILD(self)), data->type.u.ftype.args_types, gtable, ftable); /* add args of the function on the stack */
-
-        sprintf(buff2, "%d", offset);
-        ADD("rsp", buff2); /* realigning the stack */
+        sprintf(args_offset, "%d", offset);
+        ADD("rsp", args_offset); /* realigning the stack */
     }
 
     PUSH("r15"); /* push the old rsp position on the top of the stack */
@@ -970,7 +982,8 @@ static void functioncall_instr(Node *self, Kind last_eff_kind, SymbolsTable *gta
     POP("rsp");
 
     if (last_eff_kind == SuiteInstr && !data->type.u.ftype.no_ret) {
-        ADD("rsp", buff); /* buff is always the return size here ; disallocates the unusable returned value */
+        COMMENT("empty the stack");
+        ADD("rsp", return_size); /* buff is always the return size here ; disallocates the unusable returned value */
     }
 }
 

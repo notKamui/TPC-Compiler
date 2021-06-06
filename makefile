@@ -34,3 +34,4 @@ clean:
 
 mrproper: clean
 	rm -f testoutputs.txt bin/*
+	rm -f *.asm
