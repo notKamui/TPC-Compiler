@@ -704,7 +704,7 @@ static void struct_assign(TPCData *ldata, Node *rvalue, SymbolsTable *gtable, Sy
         sprintf(buff, "%d", struct_table->max_offset - 1);
         MOV("r9", buff);
         SUB("r9", "rax");
-        sprintf(buff, "BYTE [%s + rax]", FIRSTCHILD(rvalue)->u.identifier); /* remove the offset */
+        sprintf(buff, "BYTE [%s + r9]", FIRSTCHILD(rvalue)->u.identifier); /* remove the offset */
         MOV("bl", buff);
     } else {
         print_err(source_fname, SEM_ERR, rvalue->lineno, rvalue->charno, "unknown symbol %s\n", FIRSTCHILD(rvalue)->u.identifier);
