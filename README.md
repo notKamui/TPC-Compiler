@@ -6,11 +6,11 @@ by notKamui & ZwenDo, syntax defined by the Université Gustave Eiffel
 
 ### Summary
 
-- [The Language](#The-Language)
-- [Requirements](#Requirements)
-- [Compiling the Compiler](#Compiling-the-Compiler)
-- [Usage](#Usage)
-- [Sample](#Sample)
+-   [The Language](#The-Language)
+-   [Requirements](#Requirements)
+-   [Compiling the Compiler](#Compiling-the-Compiler)
+-   [Usage](#Usage)
+-   [Sample](#Sample)
 
 ### The Language
 
@@ -25,9 +25,9 @@ The only two primitives are `int` and `char`, and the only control flow instruct
 
 ### Requirements
 
-- Make sure you're on a \*nix system (Linux, MacOS, etc)
-- Make sure you have a recent version of `gcc` installed
-- Make sure you have `make` installed
+-   Make sure you're on a \*nix system (Linux, MacOS, etc)
+-   Make sure you have a recent version of `gcc` installed
+-   Make sure you have `make` installed
 
 ### Compiling the Compiler
 
@@ -49,7 +49,7 @@ tpcc can also receive its input feed from stdin
 
 ### Sample
 
-A good sample is given in `./sample/mini_game.tpc`. It's a valid tpc program than you can compile and execute (it's a Guess The Number game).
+A good sample is given in `./sample/mini_game.tpc`. It's a valid tpc program that you can compile and execute (it's a Guess The Number game).
 
 Compile and execute it with the following commands:
 
