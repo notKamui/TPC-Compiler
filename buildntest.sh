@@ -34,7 +34,7 @@ launch(){
             let passed++
         fi
     else
-        echo "--> Uncatched error" | tee -a testoutputs.txt
+        echo "--> Uncaught error" | tee -a testoutputs.txt
     fi
 
     echo | tee -a testoutputs.txt
@@ -68,8 +68,8 @@ if [ $total = $passed ]; then
 else
     printf "\033[0;31m"
 fi
-echo -e "$passed out of $total test(s) passed!" | tee -a testoutputs.txt
+echo "$passed out of $total test(s) passed!" | tee -a testoutputs.txt
 printf "\033[0m"
 
 make clean
-echo -e "\033[0;32mDone! Complete test reports in testoutputs.txt\033[0m"
+echo "\033[0;32mDone! Complete test reports in testoutputs.txt\033[0m"

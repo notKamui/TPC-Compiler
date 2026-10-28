@@ -11,7 +11,7 @@
   extern int charno;
   extern int yyleng;
   extern char errline[1024];
-  int yylex();
+  int yylex(void);
   void yyerror(const char *);
   struct Node* rootProg;
   SymbolsTable* table;
@@ -216,14 +216,15 @@ int main(int argc, char** argv) {
         dup2(fileno(file), STDIN_FILENO);
         fclose(file);
 
-        strcpy(cut, source_filename);;
-        tmp = strtok(cut, "/");
-        while (tmp != NULL) {
-            strcpy(cut, tmp);
-            tmp = strtok(NULL, "/");
+        tmp = strrchr(source_filename, '/');
+        tmp = tmp ? tmp + 1 : source_filename;
+        strncpy(cut, tmp, sizeof(cut) - 1);
+        cut[sizeof(cut) - 1] = '\0';
+        tmp = strchr(cut, '.');
+        if (tmp) {
+            *tmp = '\0';
         }
-        
-        strcpy(fname, strtok(cut, "."));
+        strcpy(fname, cut);
     } else {
         is_anon = 1;
         strcpy(source_filename, "_anonymous.tpc");
@@ -266,12 +267,17 @@ int main(int argc, char** argv) {
     fclose(output);
 
     if (withExecutable) {
+#ifdef __APPLE__
+        sprintf(buf, "clang -arch arm64 -x assembler %s -o %s", fname, is_anon ? "_anonymous" : cut);
+        system(buf);
+#else
         sprintf(buf, "nasm -f elf64 %s", fname);
         system(buf);
         sprintf(buf, "gcc -no-pie %s.o -o %s", is_anon ? "_anonymous" : cut, is_anon ? "_anonymous" : cut);
         system(buf);
         sprintf(buf, "rm %s.o", is_anon ? "_anonymous" : cut);
         system(buf);
+#endif
     }
 
     if (noOutput) {

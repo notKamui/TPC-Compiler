@@ -20,7 +20,7 @@ struct ht {
     size_t length;
 };
 
-HashTable *hashtable_new() {
+HashTable *hashtable_new(void) {
     HashTable *table = malloc(sizeof(HashTable));
     if (table == NULL) {
         return NULL;

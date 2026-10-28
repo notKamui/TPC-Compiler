@@ -1,37 +1,60 @@
-CC=gcc
-DEPS=abstract-tree symbols-table symbol hashtable translation translation_utils sem-err lex.yy
-OBJ=$(DEPS:%=obj/%.o)
-CFLAGS=-Wall -ly -lfl -pedantic -g
-EXEC=tpcc
-PARSER=parser
-LEXER=lexer
+CC = gcc
+CFLAGS = -Wall -pedantic -g -Isrc -I$(OBJDIR)
+DEPFLAGS = -MMD -MP
 
-all : makedirs bin/$(EXEC)
+EXEC = tpcc
+PARSER = parser
+LEXER = lexer
+OBJDIR = obj
+BINDIR = bin
 
-makedirs:
-	@mkdir -p bin
-	@mkdir -p obj
+SRCS = abstract-tree.c symbols-table.c symbol.c hashtable.c \
+	translation.c translation_utils.c sem-err.c
 
-bin/$(EXEC): src/$(PARSER).tab.c $(OBJ) 
-	$(CC) src/$(PARSER).tab.c $(OBJ) -o bin/$(EXEC)
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+SRCS += arm64_emit.c
+else
+SRCS += elf64_emit.c
+endif
 
-obj/lex.yy.o: src/lex.yy.c
-	$(CC) -c src/lex.yy.c -o obj/lex.yy.o $(CFLAGS)
+OBJS = $(SRCS:%.c=$(OBJDIR)/%.o) \
+	$(OBJDIR)/$(PARSER).tab.o \
+	$(OBJDIR)/lex.yy.o
 
-src/lex.yy.c: src/$(LEXER).l
-	flex -o $@ src/$(LEXER).l
+.PHONY: all clean fullclean
+.DELETE_ON_ERROR:
+.SUFFIXES:
 
-obj/%.o: src/%.c src/%.h
-	$(CC) -c $< -o $@ $(CFLAGS)
+all: $(BINDIR)/$(EXEC)
 
-src/$(PARSER).tab.c: src/$(PARSER).y
-	bison -d src/$(PARSER).y
-	@mv $(PARSER).tab.c src/
-	@mv $(PARSER).tab.h src/
+$(BINDIR)/$(EXEC): $(OBJS) | $(BINDIR)
+	$(CC) $(OBJS) -o $@
+
+$(SRCS:%.c=$(OBJDIR)/%.o): $(OBJDIR)/%.o: src/%.c | $(OBJDIR)
+	$(CC) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/$(PARSER).tab.o: $(OBJDIR)/$(PARSER).tab.c | $(OBJDIR)
+	$(CC) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/lex.yy.o: $(OBJDIR)/lex.yy.c $(OBJDIR)/$(PARSER).tab.c | $(OBJDIR)
+	$(CC) $(DEPFLAGS) $(CFLAGS) -w -c $< -o $@
+
+$(OBJDIR)/$(PARSER).tab.c: src/$(PARSER).y | $(OBJDIR)
+	bison -d -o $@ $<
+
+$(OBJDIR)/lex.yy.c: src/$(LEXER).l | $(OBJDIR)
+	flex -o $@ $<
+
+$(OBJDIR) $(BINDIR):
+	mkdir -p $@
 
 clean:
-	rm -f src/lex.yy.* src/$(PARSER).tab.* $(PARSER).output obj/*
+	rm -rf $(OBJDIR)
+	rm -f src/lex.yy.* src/$(PARSER).tab.* $(PARSER).output
 
-mrproper: clean
-	rm -f testoutputs.txt bin/*
-	rm -f *.asm
+fullclean: clean
+	rm -rf $(BINDIR)
+	rm -f testoutputs.txt *.asm
+
+-include $(OBJS:.o=.d)

@@ -15,7 +15,7 @@ typedef struct ht HashTable;
  * 
  * @return the new hash table or NULL if issuficient memory
  */
-HashTable *hashtable_new();
+HashTable *hashtable_new(void);
 
 /**
  * @brief Deletes and frees a hash table

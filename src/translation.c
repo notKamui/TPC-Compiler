@@ -70,22 +70,28 @@ static int is_prim(Node *name, SymbolsTable *gtable, SymbolsTable *ftable) {
 }
 
 static void decl_types(Node *type, SymbolsTable *gtable) {
-    char str_type[10];
     Node *n;
     char tmp[71];
     SymbolsTable *t;
 
     if (type->kind == Primitive) {
         for (n = FIRSTCHILD(type); n; n = n->nextSibling) {
-            sprintf(str_type, "res%c", size_to_declsize(prim_to_size(type->u.identifier)));
-            fprintf(file, "\t%s: %s 1\n", n->u.identifier, str_type);
+#ifdef __APPLE__
+            arm_reserve(n->u.identifier, (int)prim_to_size(type->u.identifier));
+#else
+            elf_reserve(n->u.identifier, (int)prim_to_size(type->u.identifier));
+#endif
         }
     } else if (type->kind == Struct) {
         sprintf(tmp, "struct %s", type->u.identifier);
         t = get_table_by_name(gtable->parent ? gtable->parent : gtable, tmp, type->lineno, type->charno);
 
         for (n = FIRSTCHILD(type); n; n = n->nextSibling) {
-            fprintf(file, "\t%s: resb %d\n", n->u.identifier, t->max_offset);
+#ifdef __APPLE__
+            arm_reserve(n->u.identifier, t->max_offset);
+#else
+            elf_reserve(n->u.identifier, t->max_offset);
+#endif
         }
     }
 }
@@ -93,18 +99,33 @@ static void decl_types(Node *type, SymbolsTable *gtable) {
 static void bss(Node *type, SymbolsTable *gtable) {
     Node *n;
 
-    fprintf(file, "section .bss\n");
+#ifdef __APPLE__
+    arm_bss_header();
+#else
+    elf_bss_header();
+#endif
 
     for (n = FIRSTCHILD(type); n; n = n->nextSibling) {
         decl_types(n, gtable);
     }
+#ifdef __APPLE__
+    arm_stack_reserve();
+#else
+    elf_stack_reserve();
+#endif
     fprintf(file, "\n");
 }
 
 static void decl_typevars(Node *typevars, SymbolsTable *gtable) {
-    fprintf(file, "section .data\n");
-    fprintf(file, "\tfmtd: db \"%s\", 0\n", "%d");
-    fprintf(file, "\tfmtc: db \"%s\", 0\n", "%c");
+#ifdef __APPLE__
+    arm_data_header();
+    arm_cstr("fmtd", "%d");
+    arm_cstr("fmtc", "%c");
+#else
+    elf_data_header();
+    elf_cstr("fmtd", "%d");
+    elf_cstr("fmtc", "%c");
+#endif
     fprintf(file, "\n");
     bss(typevars, gtable);
 }
@@ -118,7 +139,7 @@ static void decl_vars(Node *declvars, SymbolsTable *ftable) {
     }
 }
 
-static void stack_return() {
+static void stack_return(void) {
     char stack_label[14 + INT_MAX_DIGITS], end_stack_label[18 + INT_MAX_DIGITS], tmp[27 + INT_MAX_DIGITS];
     int local_label;
 
@@ -145,7 +166,7 @@ static void stack_return() {
     LABEL(end_stack_label);
 }
 
-static void return_instr() {
+static void return_instr(void) {
     COMMENT("instr return 1st part");
     if (in_main) {
         MOV("edi", "DWORD [rsp]");
@@ -1138,6 +1159,15 @@ static void decl_fonct(Node *fonct, SymbolsTable *gtable) {
     assert(ftable);
 
     LABEL(&(*(name + 5)));
+#ifdef __APPLE__
+    if (strcmp(name + 5, "main") == 0) {
+        arm_main_enter();
+    }
+#else
+    if (strcmp(name + 5, "main") == 0) {
+        elf_main_enter();
+    }
+#endif
     PUSH("rbp");
     MOV("rbp", "rsp");
 
@@ -1162,10 +1192,11 @@ static void decl_fonct(Node *fonct, SymbolsTable *gtable) {
 static void decl_foncts(Node *foncts, SymbolsTable *gtable) {
     Node *n;
 
-    fprintf(file, "section .text\n");
-    fprintf(file, "extern printf\n");
-    fprintf(file, "extern scanf\n");
-    fprintf(file, "global main\n\n");
+#ifdef __APPLE__
+    arm_text_header();
+#else
+    elf_text_header();
+#endif
 
     for (n = FIRSTCHILD(foncts); n; n = n->nextSibling) {
         decl_fonct(n, gtable);
