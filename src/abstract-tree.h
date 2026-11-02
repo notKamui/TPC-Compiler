@@ -55,6 +55,7 @@ typedef struct Node {
     int charno;
 } Node;
 
+int yylex(void);
 Node *makeNode(Kind kind);
 void addSibling(Node *node, Node *sibling);
 void addChild(Node *parent, Node *child);

@@ -9,7 +9,7 @@ OBJDIR = obj
 BINDIR = bin
 
 SRCS = abstract-tree.c symbols-table.c symbol.c hashtable.c \
-	translation.c translation_utils.c sem-err.c
+	translation.c translation_utils.c sem-err.c main.c
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -33,6 +33,8 @@ $(BINDIR)/$(EXEC): $(OBJS) | $(BINDIR)
 
 $(SRCS:%.c=$(OBJDIR)/%.o): $(OBJDIR)/%.o: src/%.c | $(OBJDIR)
 	$(CC) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/main.o: $(OBJDIR)/$(PARSER).tab.c
 
 $(OBJDIR)/$(PARSER).tab.o: $(OBJDIR)/$(PARSER).tab.c | $(OBJDIR)
 	$(CC) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
